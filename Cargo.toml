@@ -1,0 +1,3 @@
+[workspace]
+members = ["evm-verifier", "spartan"]
+resolver = "2"
