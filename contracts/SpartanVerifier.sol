@@ -6,8 +6,8 @@ import "./SparseMLPoly.sol";
 import "./IPA.sol";
 import "./Hyrax.sol";
 import "./EqPoly.sol";
-import "../lib/forge-std/src/console.sol";
 import "./Transcript.sol";
+// import "../lib/forge-std/src/console.sol";
 
 // Store the A, B, C matrices as multilinear polynomials
 struct EvmR1CS {
@@ -51,14 +51,6 @@ contract SpartanVerifier is SumCheck, SparseMLPoly, Hyrax {
 
     mapping(bytes32 => bool) public proofs;
 
-    // @dev Check that the proof has not been invalidated yet.
-    function assertNotInvalidated(bytes32 proofHash) public {
-        require(
-            proofs[proofHash] == false,
-            "Proof has already been invalidated"
-        );
-    }
-
     // @dev Hash `FullProof`
     function hashProof(
         FullProof memory fullProof
@@ -83,7 +75,7 @@ contract SpartanVerifier is SumCheck, SparseMLPoly, Hyrax {
         FullProof calldata fullProof
     ) public returns (bytes32) {
         bytes32 proofHash = hashProof(fullProof);
-        console.log("Proof submitted");
+        // console.log("Proof submitted");
         proofs[proofHash] = true;
         return 0;
     }
@@ -98,7 +90,7 @@ contract SpartanVerifier is SumCheck, SparseMLPoly, Hyrax {
         OpeningVerifyAuxilaries calldata auxilaries,
         EvmGens calldata gens
     ) public returns (bool) {
-        console.log("Verifying proof");
+        // console.log("Verifying proof");
         bytes32 proofHash = hashProof(fullProof);
 
         // Check if the proof exists and has not been invalided yet.

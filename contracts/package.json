@@ -1,0 +1,9 @@
+{
+  "name": "spartan-evm-contracts",
+  "version": "1.0.0",
+  "description": "",
+  "keywords": [],
+  "files": ["*.sol"],
+  "author": "",
+  "license": "ISC"
+}

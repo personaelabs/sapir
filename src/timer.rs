@@ -1,4 +1,7 @@
-use ark_std::{end_timer, perf_trace::inner::TimerInfo as ArkTimerInfo, start_timer};
+use ark_std::end_timer;
+use ark_std::perf_trace::inner::TimerInfo as ArkTimerInfo;
+#[cfg(not(target_arch = "wasm32"))]
+use ark_std::start_timer;
 #[cfg(target_arch = "wasm32")]
 use web_sys;
 

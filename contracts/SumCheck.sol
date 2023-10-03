@@ -3,7 +3,7 @@ pragma solidity ^0.8.9;
 
 import "./Hyrax.sol";
 import "./FF.sol";
-import "../lib/forge-std/src/console.sol";
+// import "../lib/forge-std/src/console.sol";
 
 struct EvmSumCheckProof {
     // Coefficients of the round polynomials

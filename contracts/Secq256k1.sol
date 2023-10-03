@@ -2,7 +2,7 @@
 pragma solidity ^0.8.9;
 
 // Uncomment this line to use console.log
-import "../lib/forge-std/src/console.sol";
+// import "../lib/forge-std/src/console.sol";
 import "./FF.sol";
 
 struct EvmAffinePoint {

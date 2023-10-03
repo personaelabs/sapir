@@ -10,7 +10,6 @@ use ark_ec::CurveGroup;
 use ethers::prelude::*;
 use std::sync::Arc;
 pub use utils::*;
-use wasm_bindgen::JsValue;
 
 pub fn generate_submit_proof_input<C: CurveGroup>(
     pcs: &Hyrax<C>,
