@@ -72,12 +72,20 @@ mod tests {
             .unwrap();
         end_timer!(send_tx_timer);
 
+        println!(
+            "Gas used for proof submission: {:?}",
+            result.gas_used.unwrap()
+        );
+
         let tx = client
             .get_transaction(result.transaction_hash)
             .await
             .unwrap()
             .unwrap();
 
+        println!("Circuit:");
+        println!("  constraints: {:?}", cs.num_constraints.unwrap());
+        println!("  wires : {:?}", cs.num_vars());
         println!("calldata size: {:?}", tx.input.len());
 
         let auxiliaries = OpeningVerifyAuxilaries {
@@ -93,7 +101,6 @@ mod tests {
         tx.tx.set_gas(100000000u64);
 
         let result = tx.send().await.unwrap().await.unwrap().unwrap();
-
-        println!("result: {:?}", result);
+        println!("Gas used for verification: {:?}", result.gas_used.unwrap());
     }
 }
