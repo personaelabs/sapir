@@ -179,8 +179,6 @@ mod tests {
     use super::*;
     use crate::frontend::constraint_system::ConstraintSystem;
     use ark_ff::Field;
-    use ethers::prelude::*;
-    use ethers::utils::keccak256;
     type F = ark_secq256k1::Fr;
 
     fn to_addr_circuit<F: PrimeField>(cs: &mut ConstraintSystem<F>) {
@@ -192,8 +190,12 @@ mod tests {
 
     #[test]
     fn test_to_addr() {
-        let pub_key_str = "765b012d6340fd3baf3068e3e118a68a559b832af2d9ddd05585fedcf9f9c2a95a65f71708281d9e1517e28c3643fa932d7675a233d8cc4edc3440c10684cd95";
+        // Public key which underlies dantehrani.eth
+        let pub_key_str = "0x765b012d6340fd3baf3068e3e118a68a559b832af2d9ddd05585fedcf9f9c2a95a65f71708281d9e1517e28c3643fa932d7675a233d8cc4edc3440c10684cd95";
         let pub_key_bytes = hex::decode(pub_key_str).unwrap();
+
+        let expected_address_str = "0x400ea6522867456e988235675b9cb5b1cf5b79c8";
+        let expected_address = hex::decode(expected_address_str).unwrap();
 
         let pub_key_bits = pub_key_bytes
             .iter()
@@ -216,9 +218,8 @@ mod tests {
         let mut cs = ConstraintSystem::new();
 
         let priv_input = pub_key_bits;
-        let pub_key_hash = &keccak256(&pub_key_bytes);
         // Take the last 20 bytes
-        let addr = F::from(BigUint::from_bytes_be(&pub_key_hash[12..]));
+        let addr = F::from(BigUint::from_bytes_be(&expected_address));
         // let addr = F::from(BigUint::from_bytes_le(&keccak256(&pub_key_bytes)));
         let pub_input = [addr];
 

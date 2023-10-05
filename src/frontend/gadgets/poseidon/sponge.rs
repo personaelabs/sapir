@@ -5,7 +5,6 @@ use poseidon::{
     sponge::{IOPattern, PoseidonSponge},
     PoseidonConstants,
 };
-use std::result::Result;
 
 // Implements SAFE (Sponge API for Field Elements): https://hackmd.io/bHgsH6mMStCVibM_wYvb2w
 #[derive(Clone)]
@@ -92,14 +91,6 @@ impl<F: PrimeField, const WIDTH: usize> PoseidonSpongeChip<F, WIDTH> {
 
         self.io_count += 1;
         y
-    }
-
-    pub fn finish(&self) -> Result<(), String> {
-        if self.io_count != self.io_pattern.0.len() {
-            return Err("IO pattern mismatch".to_string());
-        }
-
-        Ok(())
     }
 
     fn permute(&mut self) {

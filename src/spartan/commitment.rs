@@ -1,10 +1,6 @@
 use ark_ec::CurveGroup;
 use ark_ff::UniformRand;
 use rand::{rngs::StdRng, SeedableRng};
-use sha3::{
-    digest::{ExtendableOutput, Input, XofReader},
-    Shake256,
-};
 
 #[derive(Clone)]
 pub struct Gens<C: CurveGroup> {
@@ -16,19 +12,11 @@ pub struct Gens<C: CurveGroup> {
 
 impl<C: CurveGroup> Gens<C> {
     pub fn new(n: usize) -> Self {
-        // Inspired by microsoft/Spartan
-        let mut shake = Shake256::default();
-        shake.input(b"spartan-evm");
-
-        let mut reader = shake.xof_result();
-        let mut uniform_bytes = [0u8; 32];
-
         let seed = [0u8; 32];
         let mut rng: StdRng = SeedableRng::from_seed(seed);
         let mut G: Vec<C> = Vec::new();
         let mut G_affine: Vec<C::Affine> = Vec::new();
         for _ in 0..n {
-            reader.read(&mut uniform_bytes);
             let G_i = C::Affine::rand(&mut rng);
             G_affine.push(G_i);
             G.push(G_i.into());
@@ -36,7 +24,6 @@ impl<C: CurveGroup> Gens<C> {
 
         let H: C = C::Affine::rand(&mut rng).into();
 
-        reader.read(&mut uniform_bytes);
         let u = C::Affine::rand(&mut rng).into();
 
         // TODO: This is not secure

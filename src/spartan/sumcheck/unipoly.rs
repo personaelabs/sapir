@@ -4,11 +4,13 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 #[derive(Clone, CanonicalSerialize, CanonicalDeserialize)]
 pub struct UniPoly<F: PrimeField> {
     pub coeffs: Vec<F>, // coefficients in ascending degree
+    pub eval_at_1: F,
 }
 
 impl<F: PrimeField> UniPoly<F> {
     pub fn new(coeffs: Vec<F>) -> Self {
-        Self { coeffs }
+        let eval_at_1 = coeffs.iter().fold(F::ZERO, |acc, f| acc + f);
+        Self { coeffs, eval_at_1 }
     }
 
     fn eval_cubic(&self, x: F) -> F {
@@ -45,7 +47,7 @@ impl<F: PrimeField> UniPoly<F> {
 
     pub fn eval_binary(&self, x: bool) -> F {
         if x {
-            self.coeffs.iter().fold(F::ZERO, |acc, f| acc + f)
+            self.eval_at_1
         } else {
             self.coeffs[self.coeffs.len() - 1]
         }
@@ -77,17 +79,17 @@ impl<F: PrimeField> UniPoly<F> {
 
             let c = evals[1] - d - a - b;
 
-            Self {
-                coeffs: vec![a, b, c, d],
-            }
+            let coeffs = vec![a, b, c, d];
+            let eval_at_1 = coeffs.iter().fold(F::ZERO, |acc, f| acc + f);
+            Self { coeffs, eval_at_1 }
         } else {
             let c = evals[0];
             let a = (evals[2] - evals[1] - evals[1] + evals[0]) * two_inv;
             let b = evals[1] - a - c;
 
-            Self {
-                coeffs: vec![a, b, c],
-            }
+            let coeffs = vec![a, b, c];
+            let eval_at_1 = coeffs.iter().fold(F::ZERO, |acc, f| acc + f);
+            Self { coeffs, eval_at_1 }
         }
     }
 }

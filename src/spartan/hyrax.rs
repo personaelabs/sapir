@@ -1,5 +1,5 @@
 use ark_ec::CurveGroup;
-use ark_ff::{Field, UniformRand};
+use ark_ff::Field;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 
 use crate::{

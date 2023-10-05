@@ -1,12 +1,10 @@
+use crate::{
+    spartan::utils::{inner_prod, msm_powers},
+    ScalarField,
+};
 use ark_ec::CurveGroup;
 use ark_ff::{Field, UniformRand};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-
-use crate::{
-    spartan::utils::{inner_prod, msm_powers},
-    timer::{profiler_end, profiler_start},
-    ScalarField,
-};
 
 use super::{
     commitment::Gens,
@@ -282,12 +280,6 @@ impl<C: CurveGroup> Bulletproof<C> {
 
         let s = Self::compute_scalars(&r, &r_inv, n);
 
-        // TODO: Can we avoid computing the inverse of s here?
-        let s_inv = s
-            .iter()
-            .map(|s| s.inverse().unwrap())
-            .collect::<Vec<ScalarField<C>>>();
-
         let s_a = Self::scale_vec(&s, proof.a);
 
         let mut b_folded = proof.b.clone();
@@ -299,8 +291,6 @@ impl<C: CurveGroup> Bulletproof<C> {
         assert_eq!(b_folded.len(), 1);
 
         let b = b_folded[0];
-
-        let s_b = Self::scale_vec(&s_inv, b);
 
         //let s_b = Self::scale_vec(&s_inv, b);
         let a_b = proof.a * b;

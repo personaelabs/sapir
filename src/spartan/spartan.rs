@@ -105,7 +105,7 @@ impl<C: CurveGroup> Spartan<C> {
         // described in Section 4.1 https://eprint.iacr.org/2019/317.pdf
         let init_blinder_poly_timer = profiler_start("Init blinder poly");
         let (blinder_poly, blinder_poly_comm, blinder_poly_sum) =
-            init_blinder_poly(m, pcs, transcript);
+            init_blinder_poly(m, 3, pcs, transcript);
         profiler_end(init_blinder_poly_timer);
 
         let sc_phase_1_timer = profiler_start("Sumcheck phase 1");
@@ -313,7 +313,7 @@ mod tests {
 
     #[test]
     fn test_spartan_2() {
-        let num_cons = 2usize.pow(17);
+        let num_cons = 2usize.pow(18);
 
         let synthesizer = mock_circuit(num_cons);
         let mut cs = ConstraintSystem::new();
@@ -333,14 +333,12 @@ mod tests {
 
         timer_end(proof_gen_timer);
 
-        /*
         let mut verifier_transcript = Transcript::new(b"test_spartan");
         let proof_verify_timer = timer_start("Verify");
-        let inters = spartan
+        let _inters = spartan
             .verify(&r1cs, &bp, &proof, &mut verifier_transcript, true)
             .unwrap();
 
         timer_end(proof_verify_timer);
-         */
     }
 }
