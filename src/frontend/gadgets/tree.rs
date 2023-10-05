@@ -163,8 +163,10 @@ mod tests {
                 cs,
             );
 
-            let node = verify_merkle_proof(leaf, &siblings, &path_indices, sponge_chip.clone(), cs);
-            cs.expose_public(node);
+            let root = verify_merkle_proof(leaf, &siblings, &path_indices, sponge_chip.clone(), cs);
+            root.println();
+
+            cs.expose_public(root);
         };
 
         let siblings = (0..TREE_DEPTH)
@@ -177,11 +179,14 @@ mod tests {
 
         let leaf = F::from(3u32);
         let mut node = leaf;
-        for (sibling, sel) in siblings.iter().zip(path_indices.iter()) {
-            if sel & 1 == 1 {
+        for (sibling, index) in siblings.iter().zip(path_indices.iter()) {
+            let is_index_even = index & 1 == 1;
+            if is_index_even {
+                // If the index of node is even, the sibling is on the right
                 poseidon_sponge.absorb(&[node, *sibling]);
                 node = poseidon_sponge.squeeze(1)[0];
             } else {
+                // If the index of node is odd, the sibling is on the left
                 poseidon_sponge.absorb(&[*sibling, node]);
                 node = poseidon_sponge.squeeze(1)[0];
             }

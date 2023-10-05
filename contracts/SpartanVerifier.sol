@@ -120,7 +120,7 @@ contract SpartanVerifier is SumCheck, SparseMLPoly, Hyrax {
 
         // Verify the opening of the blinder polynomial
         // TODO: Check that the auxiliary information is provided
-        Hyrax.verify(scProof1.blindPolyEvalProof, rx, auxilaries, gens, state);
+        IPA.verify(scProof1.blindPolyEvalProof, rx, gens, state);
 
         // Verify the final evaluation
         uint256 eqTauEval = EqPoly.eval(rx, tau);
@@ -171,7 +171,7 @@ contract SpartanVerifier is SumCheck, SparseMLPoly, Hyrax {
         );
 
         // Verify the opening of the blinder polynomial
-        Hyrax.verify(scProof1.blindPolyEvalProof, rx, auxilaries, gens, state);
+        IPA.verify(scProof1.blindPolyEvalProof, rx, gens, state);
 
         // Concatinate rx and ry
         uint256[] memory rxry = new uint256[](rx.length + ry.length);
@@ -227,7 +227,7 @@ contract SpartanVerifier is SumCheck, SparseMLPoly, Hyrax {
         );
 
         // Verify the witness polynomial opening
-        Hyrax.verify(scProof1.blindPolyEvalProof, rx, auxilaries, gens, state);
+        IPA.verify(scProof1.blindPolyEvalProof, rx, gens, state);
 
         return true;
     }

@@ -1,8 +1,8 @@
 use ark_ec::CurveGroup;
-use ark_ff::{Field, UniformRand};
+use ark_ff::{Field, PrimeField, UniformRand};
 
-use crate::spartan::hyrax::{Hyrax, HyraxComm, PolyEvalProofInters};
-use crate::spartan::polynomial::ml_poly::MlPoly;
+use crate::spartan::hyrax::Hyrax;
+use crate::spartan::ipa::{IPAComm, IPAInters};
 use crate::spartan::sumcheck::unipoly::UniPoly;
 use crate::spartan::transcript::Transcript;
 use crate::timer::{profiler_end, profiler_start};
@@ -10,31 +10,96 @@ use crate::ScalarField;
 
 use super::SumCheckProof;
 
-fn init_blinder_poly<C: CurveGroup>(
+#[derive(Clone)]
+pub struct BlinderPoly<F: PrimeField> {
+    pub uni_polys: Vec<UniPoly<F>>,
+    pub evals: Vec<F>, // Evaluation over the boolean hypercube
+    pub sum: F,
+}
+
+impl<F: PrimeField> BlinderPoly<F> {
+    pub fn new(coeffs: Vec<Vec<F>>) -> Self {
+        let num_vars = coeffs.len();
+        let uni_polys = coeffs
+            .iter()
+            .map(|coeffs| UniPoly::new(coeffs.clone()))
+            .collect::<Vec<UniPoly<F>>>();
+
+        let num_evals = 2usize.pow(num_vars as u32);
+
+        let evals = (0..num_evals)
+            .map(|x| {
+                let mut eval = F::ZERO;
+                let mut x = x;
+                for uni_poly in uni_polys.iter().rev() {
+                    eval += uni_poly.eval_binary(x & 1 == 1);
+                    x >>= 1;
+                }
+
+                eval
+            })
+            .collect::<Vec<F>>();
+
+        let sum = evals.iter().fold(F::ZERO, |acc, x| acc + *x);
+
+        Self {
+            uni_polys,
+            evals,
+            sum,
+        }
+    }
+
+    pub fn eval(&self, x: &[F]) -> F {
+        let mut result = F::ZERO;
+        for (i, uni_poly) in self.uni_polys.iter().rev().enumerate() {
+            result += uni_poly.eval(x[i]);
+        }
+        result
+    }
+}
+
+pub fn init_blinder_poly<C: CurveGroup>(
     num_vars: usize,
     bp: &Hyrax<C>,
     transcript: &mut Transcript<C>,
-) -> (MlPoly<ScalarField<C>>, HyraxComm<C>, ScalarField<C>) {
+) -> (BlinderPoly<ScalarField<C>>, IPAComm<C>, ScalarField<C>) {
     // We implement the zero-knowledge sumcheck protocol
     // described in Section 4.1 https://eprint.iacr.org/2019/317.pdf
 
     let mut rng = rand::thread_rng();
     // Sample a blinding polynomial g(x_1, ..., x_m)
-    let blinder_poly_evals = (0..2usize.pow(num_vars as u32))
-        .map(|_| ScalarField::<C>::rand(&mut rng))
-        .collect::<Vec<ScalarField<C>>>();
-    let blinder_poly = MlPoly::new(blinder_poly_evals.clone());
-    let blinder_poly_sum = blinder_poly_evals
+    // The blinding polynomial should be a univariate polynomial
+    // We'll open the blinding polynomial at 2dl coefficients
+    let d = 3;
+    let random_coeffs = (0..num_vars)
+        .map(|_| {
+            (0..d)
+                .map(|_| ScalarField::<C>::rand(&mut rng))
+                .collect::<Vec<ScalarField<C>>>()
+        })
+        .collect::<Vec<Vec<ScalarField<C>>>>();
+
+    let mut random_coeffs_flat = random_coeffs
         .iter()
-        .fold(ScalarField::<C>::ZERO, |acc, x| acc + x);
+        .flatten()
+        .map(|x| *x)
+        .collect::<Vec<ScalarField<C>>>();
+
+    random_coeffs_flat.resize(
+        random_coeffs_flat.len().next_power_of_two(),
+        ScalarField::<C>::ZERO,
+    );
+
+    let blinder_poly = BlinderPoly::new(random_coeffs.clone());
 
     let blinder = ScalarField::<C>::rand(&mut rng);
     let commit_b_timer = profiler_start("Commit blinder polynomial");
-    let blinder_poly_comm = bp.commit(blinder_poly_evals, blinder);
+    let blinder_poly_comm = bp.bp.commit(random_coeffs_flat, blinder);
     profiler_end(commit_b_timer);
 
+    let blinder_poly_sum = blinder_poly.sum;
     transcript.append_fe(blinder_poly_sum);
-    transcript.append_points(&blinder_poly_comm.T);
+    transcript.append_point(blinder_poly_comm.comm);
 
     (blinder_poly, blinder_poly_comm, blinder_poly_sum)
 }
@@ -63,18 +128,17 @@ pub fn prove_sum<C: CurveGroup>(
     eval_tables: &mut Vec<Vec<ScalarField<C>>>,
     comb_func: impl Fn(&[ScalarField<C>]) -> ScalarField<C>,
     pcs: &Hyrax<C>,
+    blinder_poly_sum: ScalarField<C>,
+    blinder_poly: BlinderPoly<ScalarField<C>>,
+    blinder_poly_comm: &IPAComm<C>,
     transcript: &mut Transcript<C>,
     label: String,
 ) -> SumCheckProof<C> {
     let num_tables = eval_tables.len();
     let mut round_polys = Vec::<UniPoly<ScalarField<C>>>::with_capacity(poly_num_vars);
 
-    // We implement the zero-knowledge sumcheck protocol
-    // described in Section 4.1 https://eprint.iacr.org/2019/317.pdf
-    let (blinder_poly, blinder_poly_comm, blinder_poly_sum) =
-        init_blinder_poly(poly_num_vars, pcs, transcript);
-
     let mut blinder_table = blinder_poly.evals.clone();
+    blinder_table.reverse();
 
     let rho = transcript.challenge_fe(rho_label(label.clone()));
 
@@ -125,7 +189,44 @@ pub fn prove_sum<C: CurveGroup>(
 
     profiler_end(sc_timer);
 
-    let blinder_poly_eval_proof = pcs.open(&blinder_poly_comm, challenge, transcript);
+    let open_blinder_poly_profiler = profiler_start("Open blinder poly");
+    // Compute the domain which inner product will be the evaluation of the blinder polynomial
+
+    let mut b = vec![];
+    let uni_poly_degree = blinder_poly.uni_polys[0].coeffs.len() - 1;
+
+    let actual_y = blinder_poly.eval(&challenge);
+    println!("actual_y {}", actual_y);
+
+    for challenge_i in challenge {
+        let mut challenge_i_powers = vec![];
+        let mut c_pow = ScalarField::<C>::ONE;
+
+        for d in 0..(uni_poly_degree + 1) {
+            if d == 0 {
+                challenge_i_powers.push(c_pow);
+            } else {
+                c_pow *= challenge_i;
+                challenge_i_powers.push(c_pow);
+            }
+        }
+
+        challenge_i_powers.reverse();
+        b.push(challenge_i_powers);
+    }
+
+    let mut b_flatten = b
+        .iter()
+        .flatten()
+        .map(|x| *x)
+        .collect::<Vec<ScalarField<C>>>();
+
+    b_flatten.resize(b_flatten.len().next_power_of_two(), ScalarField::<C>::ZERO);
+
+    let blinder_poly_eval_proof = pcs.bp.open(&blinder_poly_comm, b_flatten, transcript);
+    println!("blinder_poly_eval_proof.y {}", blinder_poly_eval_proof.y);
+
+    profiler_end(open_blinder_poly_profiler);
 
     SumCheckProof {
         label: label.to_string(),
@@ -147,10 +248,10 @@ pub fn verify_sum<C: CurveGroup>(
     poly: impl Fn(&[ScalarField<C>]) -> ScalarField<C>,
     transcript: &mut Transcript<C>,
     compute_inters: bool,
-) -> Option<PolyEvalProofInters<C>> {
+) -> Option<IPAInters<C>> {
     // Append the sum and the commitment to the blinder polynomial to the transcript.
     transcript.append_fe(proof.blinder_poly_sum);
-    transcript.append_points(&proof.blinder_poly_eval_proof.T);
+    transcript.append_point(proof.blinder_poly_eval_proof.comm);
 
     // Get the challenge to combine the blinder polynomial with the summed polynomial(s).
     let rho = transcript.challenge_fe(rho_label(proof.label.clone()));
@@ -176,15 +277,18 @@ pub fn verify_sum<C: CurveGroup>(
 
     // Verify the opening of the blinder polynomial.
 
-    let poly_eval = (poly)(&challenge) + rho * proof.blinder_poly_eval_proof.inner_prod_proof.y;
+    let poly_eval = (poly)(&challenge) + rho * proof.blinder_poly_eval_proof.y;
 
     assert_eq!(poly_eval, target);
 
-    bp.verify(&proof.blinder_poly_eval_proof, transcript, compute_inters)
+    bp.bp
+        .verify(&proof.blinder_poly_eval_proof, transcript, compute_inters)
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::spartan::polynomial::ml_poly::MlPoly;
+
     use super::*;
     use ark_ff::Field;
     type Curve = ark_secq256k1::Projective;
@@ -192,7 +296,7 @@ mod tests {
 
     #[test]
     fn test_sumcheck() {
-        let poly_num_vars = 8;
+        let poly_num_vars = 9;
         let poly_num_entries = 2usize.pow(poly_num_vars as u32);
         let poly_degree = 2;
         let mut prover_transcript = Transcript::<Curve>::new(b"test_sumcheck");
@@ -223,12 +327,18 @@ mod tests {
         let comb_func = |x: &[Fp]| x[0] * x[1] - x[2];
 
         let sumcheck_prove_timer = profiler_start("Sumcheck prove");
+        let (blinder_poly, blinder_poly_comm, blinder_poly_sum) =
+            init_blinder_poly(poly_num_vars, &bp, &mut prover_transcript);
+
         let sumcheck_proof = prove_sum(
             poly_num_vars,
             poly_degree,
             &mut eval_tables,
             comb_func,
             &bp,
+            blinder_poly_sum,
+            blinder_poly,
+            &blinder_poly_comm,
             &mut prover_transcript,
             "test_sumcheck".to_string(),
         );

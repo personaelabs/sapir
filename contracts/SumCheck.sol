@@ -10,7 +10,7 @@ struct EvmSumCheckProof {
     uint256[][] roundPolysCoeffs;
     // Sum of the blinder polynomial
     uint256 blindPolySum;
-    EvmPolyEvalProof blindPolyEvalProof;
+    EvmInnerProductProof blindPolyEvalProof;
 }
 
 contract SumCheck {

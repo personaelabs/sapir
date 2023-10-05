@@ -1,9 +1,9 @@
 use ark_ff::PrimeField;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 
-#[derive(CanonicalSerialize, CanonicalDeserialize)]
+#[derive(Clone, CanonicalSerialize, CanonicalDeserialize)]
 pub struct UniPoly<F: PrimeField> {
-    pub coeffs: Vec<F>,
+    pub coeffs: Vec<F>, // coefficients in ascending degree
 }
 
 impl<F: PrimeField> UniPoly<F> {
@@ -40,6 +40,14 @@ impl<F: PrimeField> UniPoly<F> {
             self.eval_quadratic(x)
         } else {
             self.eval_cubic(x)
+        }
+    }
+
+    pub fn eval_binary(&self, x: bool) -> F {
+        if x {
+            self.coeffs.iter().fold(F::ZERO, |acc, f| acc + f)
+        } else {
+            self.coeffs[self.coeffs.len() - 1]
         }
     }
 

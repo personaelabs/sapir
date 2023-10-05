@@ -1,7 +1,7 @@
 mod sc_phase_1;
 mod sc_phase_2;
 
-use super::hyrax::PolyEvalProof;
+use super::ipa::InnerProductProof;
 use ark_ec::{CurveConfig, CurveGroup};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 pub use sc_phase_1::SumCheckPhase1;
@@ -15,5 +15,5 @@ pub struct SumCheckProof<C: CurveGroup> {
     pub label: String,
     pub round_poly_coeffs: Vec<Vec<<C::Config as CurveConfig>::ScalarField>>,
     pub blinder_poly_sum: <C::Config as CurveConfig>::ScalarField,
-    pub blinder_poly_eval_proof: PolyEvalProof<C>,
+    pub blinder_poly_eval_proof: InnerProductProof<C>,
 }

@@ -1,5 +1,5 @@
 use ark_ec::CurveGroup;
-use ark_ff::Field;
+use ark_ff::{Field, UniformRand};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 
 use crate::{
@@ -8,7 +8,11 @@ use crate::{
     ScalarField,
 };
 
-use super::{commitment::Gens, transcript::Transcript, utils::msm};
+use super::{
+    commitment::Gens,
+    transcript::Transcript,
+    utils::{msm, msm_affine},
+};
 
 #[derive(Debug, Clone, CanonicalDeserialize, CanonicalSerialize)]
 pub struct InnerProductProof<C: CurveGroup> {
@@ -18,6 +22,7 @@ pub struct InnerProductProof<C: CurveGroup> {
     pub L_vec: Vec<C>,
     pub R_vec: Vec<C>,
     pub a: ScalarField<C>,
+    pub r_prime: ScalarField<C>,
 }
 
 #[derive(Clone)]
@@ -31,6 +36,7 @@ pub struct IPAComm<C: CurveGroup> {
     pub comm: C,
     // Evaluations of the polynomial
     pub poly: Vec<ScalarField<C>>,
+    pub blinder: ScalarField<C>,
 }
 
 #[derive(Clone)]
@@ -47,31 +53,12 @@ impl<C: CurveGroup> Bulletproof<C> {
     pub const fn empty() -> Self {
         Self {
             gens: Gens {
+                G_affine: vec![],
                 G: vec![],
-                H: vec![],
+                H: None,
                 u: None,
             },
         }
-    }
-
-    fn hash(
-        a: &[ScalarField<C>],
-        a_prime: &[ScalarField<C>],
-        b: &[ScalarField<C>],
-        b_prime: &[ScalarField<C>],
-        c: ScalarField<C>,
-        gens: &Gens<C>,
-    ) -> C {
-        assert_eq!(a.len(), a_prime.len());
-        assert_eq!(b.len(), b_prime.len());
-        assert_eq!(a.len(), b.len());
-
-        let a_G = msm(&[a, a_prime].concat(), &gens.G);
-        let b_H = msm(&[b, b_prime].concat(), &gens.H);
-
-        let c_u = gens.u.unwrap() * c;
-
-        a_G + b_H + c_u
     }
 
     fn fold(
@@ -104,10 +91,15 @@ impl<C: CurveGroup> Bulletproof<C> {
     }
 
     // Commit to the vector `a`
-    pub fn commit(&self, a: Vec<ScalarField<C>>, _blinder: ScalarField<C>) -> IPAComm<C> {
-        // TODO: Implement blinding
-        let comm = msm(&a, &self.gens.G[..a.len()]);
-        IPAComm { comm, poly: a }
+    pub fn commit(&self, a: Vec<ScalarField<C>>, blinder: ScalarField<C>) -> IPAComm<C> {
+        let comm =
+            msm_affine::<C>(&a, &self.gens.G_affine[..a.len()]) + self.gens.H.unwrap() * blinder;
+
+        IPAComm {
+            comm,
+            poly: a,
+            blinder,
+        }
     }
 
     pub fn open(
@@ -119,6 +111,7 @@ impl<C: CurveGroup> Bulletproof<C> {
         let a = comm_a.poly.to_vec();
         let mut n = a.len();
         assert_eq!(n, b.len());
+        assert!(n.is_power_of_two());
 
         // Compute the inner product <a, b>.
         // (i.e. the evaluation of the polynomial at `x`)
@@ -136,37 +129,33 @@ impl<C: CurveGroup> Bulletproof<C> {
         let mut L_vec = Vec::with_capacity(num_rounds);
         let mut R_vec = Vec::with_capacity(num_rounds);
 
+        let mut u_vec = Vec::with_capacity(num_rounds);
+        let mut u_inv_vec = Vec::with_capacity(num_rounds);
+        let mut r_vec = Vec::with_capacity(num_rounds);
+        let mut l_vec = Vec::with_capacity(num_rounds);
+
+        let mut rng = ark_std::rand::thread_rng();
         while n != 1 {
-            let zero = ScalarField::<C>::ZERO;
-            let zero_vec = vec![zero; n_prime];
+            let a_low = &a[..n_prime];
+            let a_high = &a[n_prime..];
 
-            let a_L = &a[..n_prime];
-            let b_L = &b[n_prime..];
+            let b_low = &b[..n_prime];
+            let b_high = &b[n_prime..];
 
-            // L = hash(0, a_L, b_L, 0, <a_L, b_L>)
-            let L = Self::hash(
-                &zero_vec,
-                a_L,
-                b_L,
-                &zero_vec,
-                inner_prod::<ScalarField<C>>(a_L, b_L),
-                &ck,
-            );
+            let G_low = &ck.G[..n_prime];
+            let G_high = &ck.G[n_prime..(n_prime * 2)];
 
-            let a_R = &a[n_prime..];
-            let b_R = &b[..n_prime];
+            let r_i = ScalarField::<C>::rand(&mut rng);
+            let l_i = ScalarField::<C>::rand(&mut rng);
+            r_vec.push(r_i);
+            l_vec.push(l_i);
 
-            // R = hash(0, a_R, b_R, 0, <a_R, b_R>)
-            let R_hash_profiler = profiler_start("R hash");
-            let R = Self::hash(
-                a_R,
-                &zero_vec,
-                &zero_vec,
-                b_R,
-                inner_prod::<ScalarField<C>>(a_R, b_R),
-                &ck,
-            );
-            profiler_end(R_hash_profiler);
+            let L = msm(a_low, G_high)
+                + ck.H.unwrap() * l_i
+                + ck.u.unwrap() * inner_prod(a_low, b_high);
+            let R = msm(a_high, G_low)
+                + ck.H.unwrap() * r_i
+                + ck.u.unwrap() * inner_prod(a_high, b_low);
 
             L_vec.push(L);
             R_vec.push(R);
@@ -176,21 +165,19 @@ impl<C: CurveGroup> Bulletproof<C> {
             transcript.append_point(R);
 
             // Get the challenge `r`
-            let r = transcript.challenge_fe("r".to_string());
-            let r_inv = r.inverse().unwrap();
+            let u = transcript.challenge_fe("r".to_string());
+            let u_inv = u.inverse().unwrap();
+            u_vec.push(u);
+            u_inv_vec.push(u_inv);
 
             // Fold a and b
-            let a_folded = Self::fold(&a, r, r_inv);
-            let b_folded = Self::fold(&b, r_inv, r);
+            let a_folded = Self::fold(&a, u, u_inv);
+            let b_folded = Self::fold(&b, u_inv, u);
 
             // Update the basis
-            let g_low_prime = Self::scale_points(&ck.G[..n_prime], r_inv);
-            let g_high_prime = Self::scale_points(&ck.G[n_prime..(n_prime * 2)], r);
+            let g_low_prime = Self::scale_points(&ck.G[..n_prime], u_inv);
+            let g_high_prime = Self::scale_points(&ck.G[n_prime..(n_prime * 2)], u);
             let g_prime = Self::hadamard(&g_low_prime, &g_high_prime);
-
-            let h_low_prime = Self::scale_points(&ck.H[..n_prime], r);
-            let h_high_prime = Self::scale_points(&ck.H[n_prime..(n_prime * 2)], r_inv);
-            let h_prime = Self::hadamard(&h_low_prime, &h_high_prime);
 
             // Update `a` and `b` for the next round
             a = a_folded;
@@ -198,14 +185,30 @@ impl<C: CurveGroup> Bulletproof<C> {
 
             // Update the commitment key
             ck = Gens {
+                G_affine: vec![], // We don't use the affine form of the generators
                 G: g_prime,
-                H: h_prime,
+                H: ck.H,
                 u: ck.u,
             };
 
             n = n_prime;
             n_prime = n / 2;
         }
+
+        // ZK-open the final a and the blind factor
+        let mut r_prime = ScalarField::<C>::ZERO;
+
+        for (u_i, l_i) in u_vec.iter().zip(l_vec.iter()) {
+            r_prime += *u_i * *u_i * *l_i;
+        }
+
+        for (u_inv_i, r_i) in u_inv_vec.iter().zip(r_vec.iter()) {
+            r_prime += *u_inv_i * *u_inv_i * *r_i;
+        }
+
+        r_prime += comm_a.blinder;
+
+        // Prove knowledge of a[0] and r_prime
 
         assert_eq!(a.len(), 1);
         assert_eq!(b.len(), 1);
@@ -219,6 +222,7 @@ impl<C: CurveGroup> Bulletproof<C> {
             b: b_vec,
             a: a[0],
             y,
+            r_prime,
         }
     }
 
@@ -303,8 +307,8 @@ impl<C: CurveGroup> Bulletproof<C> {
 
         let inters = if compute_inters {
             let sa_G_inters = msm_powers(&s_a, &self.gens.G[..s_a.len()]);
-            let sb_H_inters = msm_powers(&s_b, &self.gens.H[..s_b.len()]);
-            let b_H_inters = msm_powers(&proof.b, &self.gens.H[..proof.b.len()]);
+            let sb_H_inters = vec![];
+            let b_H_inters = vec![];
 
             Some(IPAInters {
                 sa_G_inters,
@@ -316,13 +320,11 @@ impl<C: CurveGroup> Bulletproof<C> {
         };
 
         let lhs = msm::<C>(&s_a, &self.gens.G[..s_a.len()])
-            + msm::<C>(&s_b, &self.gens.H[..s_b.len()])
+            + self.gens.H.unwrap() * proof.r_prime
             + self.gens.u.unwrap() * a_b;
 
         // Compute P
-        let mut rhs = proof.comm
-            + msm(&proof.b, &self.gens.H[..proof.b.len()])
-            + self.gens.u.unwrap() * proof.y;
+        let mut rhs = proof.comm + self.gens.u.unwrap() * proof.y;
 
         for (r_i, L_i) in r.iter().zip(proof.L_vec.iter()) {
             rhs += *L_i * (r_i.square());

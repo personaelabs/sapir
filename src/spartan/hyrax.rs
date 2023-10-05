@@ -1,10 +1,14 @@
 use ark_ec::CurveGroup;
-use ark_ff::Field;
+use ark_ff::{Field, UniformRand};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 
 use crate::{
     spartan::transcript::Transcript,
-    spartan::{ipa::Bulletproof, polynomial::eq_poly::EqPoly, utils::msm_powers},
+    spartan::{
+        ipa::Bulletproof,
+        polynomial::eq_poly::EqPoly,
+        utils::{inner_prod, msm_powers},
+    },
     spartan::{
         ipa::{IPAComm, InnerProductProof},
         utils::msm,
@@ -17,6 +21,7 @@ use super::ipa::IPAInters;
 pub struct HyraxComm<C: CurveGroup> {
     pub T: Vec<C>,
     pub w: Vec<Vec<ScalarField<C>>>,
+    pub blinders: Vec<ScalarField<C>>,
 }
 
 #[derive(Clone)]
@@ -86,28 +91,27 @@ impl<C: CurveGroup> Hyrax<C> {
         );
 
         // In column-major order
-        let mut w_rows = vec![];
+        let mut w_rows = Vec::with_capacity(self.padded_num_cols);
         for col in 0..self.padded_num_cols {
             w_rows.push(w[col * self.padded_num_rows..(col + 1) * self.padded_num_rows].to_vec());
         }
-        /*
-        for col in 0..self.padded_num_cols {
-            let mut row = Vec::with_capacity(self.padded_num_cols);
-            // In column-major order
-            for i in 0..self.padded_num_rows {
-                row.push(w[i * self.padded_num_rows + col]);
-            }
-            w_rows.push(row);
-        }
-         */
 
-        let blinder = ScalarField::<C>::from(33u64);
+        // let mut rng = ark_std::rand::thread_rng();
+        let blinders = (0..w_rows.len())
+            .map(|_| ScalarField::<C>::ZERO)
+            .collect::<Vec<ScalarField<C>>>();
+
         let T = w_rows
             .iter()
-            .map(|row| self.bp.commit(row.to_vec(), blinder).comm)
+            .zip(blinders.iter())
+            .map(|(row, blinder)| self.bp.commit(row.to_vec(), *blinder).comm)
             .collect::<Vec<C>>();
 
-        HyraxComm { T, w: w_rows }
+        HyraxComm {
+            T,
+            w: w_rows,
+            blinders,
+        }
     }
 
     // Open the committed polynomial `comm_a`'s evaluation at `x`
@@ -153,6 +157,7 @@ impl<C: CurveGroup> Hyrax<C> {
         let a_aug_comm = IPAComm {
             comm: a_aug_C,
             poly: a_aug.clone(),
+            blinder: inner_prod(&comm_a.blinders, &L),
         };
 
         let inner_prod_proof = self.bp.open(&a_aug_comm, R, transcript);
@@ -230,7 +235,7 @@ mod tests {
 
     #[test]
     fn test_hyrax() {
-        let m = 6;
+        let m = 13;
         let n = 2usize.pow(m as u32);
         let a = (0..n).map(|i| F::from((i + 33) as u64)).collect::<Vec<F>>();
         let poly = MlPoly::new(a.clone());

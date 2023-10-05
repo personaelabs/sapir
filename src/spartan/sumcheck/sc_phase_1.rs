@@ -1,12 +1,11 @@
-use ark_ec::CurveGroup;
-
+use super::sumcheck::{prove_sum, BlinderPoly};
 use crate::spartan::hyrax::Hyrax;
+use crate::spartan::ipa::IPAComm;
 use crate::spartan::polynomial::eq_poly::EqPoly;
 use crate::spartan::sumcheck::SumCheckProof;
 use crate::spartan::transcript::Transcript;
 use crate::ScalarField;
-
-use super::sumcheck::prove_sum;
+use ark_ec::CurveGroup;
 
 pub struct SumCheckPhase1<C: CurveGroup> {
     Az_evals: Vec<ScalarField<C>>,
@@ -30,6 +29,9 @@ impl<C: CurveGroup> SumCheckPhase1<C> {
     pub fn prove(
         &self,
         pcs: &Hyrax<C>,
+        blinder_poly_sum: ScalarField<C>,
+        blinder_poly: BlinderPoly<ScalarField<C>>,
+        blinder_poly_comm: &IPAComm<C>,
         transcript: &mut Transcript<C>,
     ) -> (
         SumCheckProof<C>,
@@ -54,6 +56,9 @@ impl<C: CurveGroup> SumCheckPhase1<C> {
             &mut eval_tables,
             comb_func,
             pcs,
+            blinder_poly_sum,
+            blinder_poly,
+            blinder_poly_comm,
             transcript,
             "sc_phase_1".to_string(),
         );

@@ -76,7 +76,7 @@ pub fn to_evm_poly_eval_proof<C: CurveGroup>(
 
 pub fn build_evm_sumcheck_proof<C: CurveGroup>(
     sc_proof: SumCheckProof<C>,
-    inters: PolyEvalProofInters<C>,
+    inters: IPAInters<C>,
 ) -> EvmSumCheckProof {
     let round_polys_coeffs = sc_proof
         .round_poly_coeffs
@@ -87,7 +87,7 @@ pub fn build_evm_sumcheck_proof<C: CurveGroup>(
     EvmSumCheckProof {
         round_polys_coeffs,
         blind_poly_sum: to_u256(sc_proof.blinder_poly_sum),
-        blind_poly_eval_proof: to_evm_poly_eval_proof(sc_proof.blinder_poly_eval_proof, inters),
+        blind_poly_eval_proof: build_ip_proof(sc_proof.blinder_poly_eval_proof, inters),
     }
 }
 
@@ -115,7 +115,7 @@ impl<C: CurveGroup> ToEvmVal for Gens<C> {
     fn to_evm_val(&self) -> Self::EvmVal {
         EvmGens {
             g: to_evm_points_vec(&self.G),
-            h: to_evm_points_vec(&self.H),
+            h: vec![],
             u: to_evm_point(self.u.unwrap()),
         }
     }

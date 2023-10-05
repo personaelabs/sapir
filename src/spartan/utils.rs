@@ -1,3 +1,4 @@
+use crate::ScalarField;
 use ark_ec::{CurveConfig, CurveGroup};
 use ark_ff::PrimeField;
 
@@ -23,13 +24,36 @@ pub fn msm_powers<C: CurveGroup>(
     powers
 }
 
+use ark_ff::Zero;
+
+pub fn msm_affine<C: CurveGroup>(scalars: &[ScalarField<C>], points: &[C::Affine]) -> C {
+    assert_eq!(scalars.len(), points.len());
+
+    let mut nonzero_scalar = Vec::with_capacity(scalars.len());
+    let mut bases = Vec::with_capacity(points.len());
+
+    for (s, p) in scalars.iter().zip(points.iter()) {
+        if !s.is_zero() {
+            nonzero_scalar.push(*s);
+            bases.push(*p);
+        }
+    }
+
+    C::msm_unchecked(&bases, &nonzero_scalar)
+}
+
 pub fn msm<C: CurveGroup>(scalars: &[<C::Config as CurveConfig>::ScalarField], points: &[C]) -> C {
     assert_eq!(scalars.len(), points.len());
 
-    // TODO: Can we avoid converting to affine?
-    let affine_points = points
-        .iter()
-        .map(|p| p.into_affine())
-        .collect::<Vec<C::Affine>>();
-    C::msm_unchecked(&affine_points, scalars)
+    let mut nonzero_scalar = Vec::with_capacity(scalars.len());
+    let mut bases = Vec::with_capacity(points.len());
+
+    for (s, p) in scalars.iter().zip(points.iter()) {
+        if !s.is_zero() {
+            nonzero_scalar.push(*s);
+            bases.push(p.into_affine());
+        }
+    }
+
+    C::msm_unchecked(&bases, &nonzero_scalar)
 }

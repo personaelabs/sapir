@@ -9,7 +9,8 @@ use sha3::{
 #[derive(Clone)]
 pub struct Gens<C: CurveGroup> {
     pub G: Vec<C>,
-    pub H: Vec<C>,
+    pub G_affine: Vec<C::Affine>,
+    pub H: Option<C>,
     pub u: Option<C>,
 }
 
@@ -25,21 +26,25 @@ impl<C: CurveGroup> Gens<C> {
         let seed = [0u8; 32];
         let mut rng: StdRng = SeedableRng::from_seed(seed);
         let mut G: Vec<C> = Vec::new();
+        let mut G_affine: Vec<C::Affine> = Vec::new();
         for _ in 0..n {
             reader.read(&mut uniform_bytes);
-            G.push(C::Affine::rand(&mut rng).into());
+            let G_i = C::Affine::rand(&mut rng);
+            G_affine.push(G_i);
+            G.push(G_i.into());
         }
 
-        let mut H: Vec<C> = Vec::new();
-        for _ in 0..n {
-            reader.read(&mut uniform_bytes);
-            H.push(C::Affine::rand(&mut rng).into());
-        }
+        let H: C = C::Affine::rand(&mut rng).into();
 
         reader.read(&mut uniform_bytes);
         let u = C::Affine::rand(&mut rng).into();
 
         // TODO: This is not secure
-        Self { G, H, u: Some(u) }
+        Self {
+            G,
+            G_affine,
+            H: Some(H),
+            u: Some(u),
+        }
     }
 }

@@ -1,6 +1,6 @@
 pub mod wasm_deps {
     // Re-export the dependencies that are used in the wasm module
-    pub use crate::evm_verifier::generate_submit_proof_input;
+    // pub use crate::evm_verifier::generate_submit_proof_input;
     pub use crate::frontend::constraint_system::{CircuitMeta, ConstraintSystem};
     pub use crate::r1cs::R1CS;
     pub use crate::spartan::hyrax::Hyrax;
@@ -139,6 +139,7 @@ macro_rules! circuit {
             verify(proof)
         }
 
+        /*
         #[wasm_bindgen]
         pub fn client_generate_tx_input(proof_ser: &[u8], contract_address: &[u8]) -> Vec<u8> {
             let proof = SpartanProof::<$curve>::deserialize_compressed(proof_ser).unwrap();
@@ -149,6 +150,7 @@ macro_rules! circuit {
 
             generate_submit_proof_input(&bp, proof, &circuit, contract_address)
         }
+         */
     };
 }
 

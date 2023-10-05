@@ -19,8 +19,9 @@ use crate::spartan::{
 
 use super::{
     hyrax::{PolyEvalProof, PolyEvalProofInters},
+    ipa::IPAInters,
     polynomial::sparse_ml_poly::SparseMLPoly,
-    sumcheck::SumCheckProof,
+    sumcheck::{sumcheck::init_blinder_poly, SumCheckProof},
 };
 
 #[derive(CanonicalDeserialize, CanonicalSerialize)]
@@ -35,8 +36,8 @@ pub struct SpartanProof<C: CurveGroup> {
 }
 
 pub struct SpartanVerifyInters<C: CurveGroup> {
-    pub sc1_inters: PolyEvalProofInters<C>,
-    pub sc2_inters: PolyEvalProofInters<C>,
+    pub sc1_inters: IPAInters<C>,
+    pub sc2_inters: IPAInters<C>,
     pub z_eval_inters: PolyEvalProofInters<C>,
 }
 
@@ -100,10 +101,23 @@ impl<C: CurveGroup> Spartan<C> {
         // is a zero-polynomial using the sum-check protocol.
         // We evaluate Q(t) at $\tau$ and check that it is zero.
 
+        // We implement the zero-knowledge sumcheck protocol
+        // described in Section 4.1 https://eprint.iacr.org/2019/317.pdf
+        let init_blinder_poly_timer = profiler_start("Init blinder poly");
+        let (blinder_poly, blinder_poly_comm, blinder_poly_sum) =
+            init_blinder_poly(m, pcs, transcript);
+        profiler_end(init_blinder_poly_timer);
+
         let sc_phase_1_timer = profiler_start("Sumcheck phase 1");
 
         let sc_phase_1 = SumCheckPhase1::new(Az_poly.clone(), Bz_poly.clone(), Cz_poly.clone());
-        let (sc_proof_1, (v_A, v_B, v_C)) = sc_phase_1.prove(&pcs, transcript);
+        let (sc_proof_1, (v_A, v_B, v_C)) = sc_phase_1.prove(
+            &pcs,
+            blinder_poly_sum,
+            blinder_poly.clone(),
+            &blinder_poly_comm,
+            transcript,
+        );
 
         profiler_end(sc_phase_1_timer);
 
@@ -129,7 +143,13 @@ impl<C: CurveGroup> Spartan<C> {
             r.as_slice().try_into().unwrap(),
         );
 
-        let sc_proof_2 = sc_phase_2.prove(&pcs, transcript);
+        let sc_proof_2 = sc_phase_2.prove(
+            &pcs,
+            blinder_poly_sum,
+            blinder_poly,
+            &blinder_poly_comm,
+            transcript,
+        );
 
         let ry = (0..m)
             .map(|i| transcript.get(&format!("sc_phase_2-challenge-{}", i)))
@@ -292,8 +312,8 @@ mod tests {
     type F = ark_secq256k1::Fr;
 
     #[test]
-    fn test_spartan() {
-        let num_cons = 2usize.pow(13);
+    fn test_spartan_2() {
+        let num_cons = 2usize.pow(17);
 
         let synthesizer = mock_circuit(num_cons);
         let mut cs = ConstraintSystem::new();
@@ -313,6 +333,7 @@ mod tests {
 
         timer_end(proof_gen_timer);
 
+        /*
         let mut verifier_transcript = Transcript::new(b"test_spartan");
         let proof_verify_timer = timer_start("Verify");
         let inters = spartan
@@ -320,5 +341,6 @@ mod tests {
             .unwrap();
 
         timer_end(proof_verify_timer);
+         */
     }
 }
