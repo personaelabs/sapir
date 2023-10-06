@@ -1,55 +1,65 @@
+use core::panic;
+
 use ark_ff::PrimeField;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 
 #[derive(Clone, CanonicalSerialize, CanonicalDeserialize)]
 pub struct UniPoly<F: PrimeField> {
     pub coeffs: Vec<F>, // coefficients in ascending degree
+    pub eval_at_0: F,
     pub eval_at_1: F,
+    pub eval_at_2: F,
+    pub eval_at_3: F,
 }
 
 impl<F: PrimeField> UniPoly<F> {
     pub fn new(coeffs: Vec<F>) -> Self {
+        let eval_at_0 = coeffs[coeffs.len() - 1];
         let eval_at_1 = coeffs.iter().fold(F::ZERO, |acc, f| acc + f);
-        Self { coeffs, eval_at_1 }
-    }
-
-    fn eval_cubic(&self, x: F) -> F {
-        // ax^3 + bx^2 + cx + d
-        let x_sq = x.square();
-        let x_cub = x_sq * x;
-
-        let a = self.coeffs[0];
-        let b = self.coeffs[1];
-        let c = self.coeffs[2];
-        let d = self.coeffs[3];
-
-        a * x_cub + b * x_sq + c * x + d
-    }
-
-    fn eval_quadratic(&self, x: F) -> F {
-        // ax^3 + bx^2 + cx + d
-        let x_sq = x.square();
-
-        let a = self.coeffs[0];
-        let b = self.coeffs[1];
-        let c = self.coeffs[2];
-
-        a * x_sq + b * x + c
+        let eval_at_2 = Self::eval_static(&coeffs, F::from(2u64));
+        let eval_at_3 = Self::eval_static(&coeffs, F::from(3u64));
+        Self {
+            coeffs,
+            eval_at_0,
+            eval_at_1,
+            eval_at_2,
+            eval_at_3,
+        }
     }
 
     pub fn eval(&self, x: F) -> F {
-        if self.coeffs.len() == 3 {
-            self.eval_quadratic(x)
+        Self::eval_static(&self.coeffs, x)
+    }
+
+    pub fn eval_small(&self, x: usize) -> F {
+        if x == 0 {
+            self.eval_at_0
+        } else if x == 1 {
+            self.eval_at_1
+        } else if x == 2 {
+            self.eval_at_2
+        } else if x == 3 {
+            self.eval_at_3
         } else {
-            self.eval_cubic(x)
+            panic!("x must be 0, 1, 2, or 3")
         }
+    }
+
+    pub fn eval_static(coeffs: &[F], x: F) -> F {
+        let mut result = F::ZERO;
+        let mut x_pow = F::ONE;
+        for coeff in coeffs.iter().rev() {
+            result += *coeff * x_pow;
+            x_pow *= x;
+        }
+        result
     }
 
     pub fn eval_binary(&self, x: bool) -> F {
         if x {
             self.eval_at_1
         } else {
-            self.coeffs[self.coeffs.len() - 1]
+            self.eval_at_0
         }
     }
 
@@ -80,16 +90,36 @@ impl<F: PrimeField> UniPoly<F> {
             let c = evals[1] - d - a - b;
 
             let coeffs = vec![a, b, c, d];
-            let eval_at_1 = coeffs.iter().fold(F::ZERO, |acc, f| acc + f);
-            Self { coeffs, eval_at_1 }
+            let eval_at_0 = coeffs[coeffs.len() - 1];
+            let eval_at_1 = Self::eval_static(&coeffs, F::from(1u64));
+            let eval_at_2 = Self::eval_static(&coeffs, F::from(2u64));
+            let eval_at_3 = Self::eval_static(&coeffs, F::from(3u64));
+            Self {
+                coeffs,
+                eval_at_0,
+                eval_at_1,
+                eval_at_2,
+                eval_at_3,
+            }
         } else {
             let c = evals[0];
             let a = (evals[2] - evals[1] - evals[1] + evals[0]) * two_inv;
             let b = evals[1] - a - c;
 
             let coeffs = vec![a, b, c];
-            let eval_at_1 = coeffs.iter().fold(F::ZERO, |acc, f| acc + f);
-            Self { coeffs, eval_at_1 }
+
+            let eval_at_0 = coeffs[coeffs.len() - 1];
+            let eval_at_1 = Self::eval_static(&coeffs, F::from(1u64));
+            let eval_at_2 = Self::eval_static(&coeffs, F::from(2u64));
+            let eval_at_3 = Self::eval_static(&coeffs, F::from(3u64));
+
+            Self {
+                coeffs,
+                eval_at_0,
+                eval_at_1,
+                eval_at_2,
+                eval_at_3,
+            }
         }
     }
 }

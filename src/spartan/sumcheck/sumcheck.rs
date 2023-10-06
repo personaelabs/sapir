@@ -47,53 +47,6 @@ impl<F: PrimeField> BlinderPoly<F> {
             sum,
         }
     }
-
-    pub fn eval_bounded(&self, r: &[F], x: F, b: usize) -> F {
-        let mut eval = F::ZERO;
-
-        for (uni_poly, r_i) in self.uni_polys[..r.len()].iter().zip(r.iter()) {
-            eval += uni_poly.eval(*r_i);
-        }
-
-        eval += self.uni_polys[r.len()].eval(x);
-
-        for (j, uni_poly) in self.uni_polys[(r.len() + 1)..].iter().enumerate() {
-            eval += uni_poly.eval_binary((b >> j) & 1 == 1);
-        }
-
-        eval
-    }
-
-    // Return the sum of the evaluations of the polynomial
-    // when the first i variables are set to r_i.
-    pub fn sum_bounded(&self, evals: &mut Vec<F>, domain: &[F], r: &[F], rho: F) {
-        let num_evals = 2usize.pow((self.num_vars() - r.len()) as u32);
-
-        let mut fixed_eval = F::ZERO;
-        for (uni_poly, r_i) in self.uni_polys[..r.len()].iter().zip(r.iter()) {
-            fixed_eval += uni_poly.eval(*r_i);
-        }
-
-        for i in 0..num_evals {
-            let mut eval = fixed_eval;
-            for (j, uni_poly) in self.uni_polys.iter().enumerate() {
-                eval += uni_poly.eval_binary((i >> j) & 1 == 1);
-            }
-            evals[i] = rho * eval;
-        }
-    }
-
-    fn num_vars(&self) -> usize {
-        self.uni_polys.len()
-    }
-
-    pub fn eval(&self, x: &[F]) -> F {
-        let mut result = F::ZERO;
-        for (i, uni_poly) in self.uni_polys.iter().enumerate() {
-            result += uni_poly.eval(x[i]);
-        }
-        result
-    }
 }
 
 pub fn init_blinder_poly<C: CurveGroup>(
@@ -181,9 +134,7 @@ pub fn prove_sum<C: CurveGroup>(
 
     let challenge = transcript.challenge_vec(poly_num_vars, challenge_label(label.clone()));
 
-    let round_poly_domain = (0..(poly_degree + 1))
-        .map(|i| ScalarField::<C>::from(i as u64))
-        .collect::<Vec<ScalarField<C>>>();
+    let round_poly_domain = (0..(poly_degree + 1)).map(|i| i).collect::<Vec<usize>>();
 
     let sc_timer = profiler_start("Sumcheck");
     for j in 0..poly_num_vars {
@@ -199,17 +150,33 @@ pub fn prove_sum<C: CurveGroup>(
         for b in 0..high_index {
             let r_y_i = challenge[j];
 
+            // Cache the calculation
+            let table_tmp = eval_tables
+                .iter()
+                .map(|table| (table[b + high_index] - table[b]))
+                .collect::<Vec<ScalarField<C>>>();
+
             for (i, eval_at) in round_poly_domain.iter().enumerate() {
                 let mut comb_input = Vec::with_capacity(num_tables);
-                for table in eval_tables.into_iter() {
-                    let table_eval = table[b] + (table[b + high_index] - table[b]) * eval_at;
+
+                for (table, tmp) in eval_tables.iter().zip(table_tmp.iter()) {
+                    let table_eval = if *eval_at == 0 {
+                        table[b]
+                    } else if *eval_at == 1 {
+                        table[b] + tmp
+                    } else if *eval_at == 2 {
+                        table[b] + tmp + tmp
+                    } else {
+                        table[b] + tmp + tmp + tmp
+                    };
+
                     comb_input.push(table_eval);
                 }
 
                 evals[i] += comb_func(&comb_input);
 
                 let mut blinder_eval = bounded_eval;
-                blinder_eval += blinder_poly.uni_polys[j].eval(*eval_at);
+                blinder_eval += blinder_poly.uni_polys[j].eval_small(*eval_at);
                 for (l, uni_poly) in blinder_poly.uni_polys[(j + 1)..].iter().enumerate() {
                     blinder_eval += uni_poly.eval_binary((b >> l) & 1 == 1);
                 }

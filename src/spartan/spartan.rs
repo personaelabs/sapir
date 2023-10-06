@@ -312,7 +312,7 @@ mod tests {
     type F = ark_secq256k1::Fr;
 
     #[test]
-    fn test_spartan_2() {
+    fn test_spartan() {
         let num_cons = 2usize.pow(18);
 
         let synthesizer = mock_circuit(num_cons);
