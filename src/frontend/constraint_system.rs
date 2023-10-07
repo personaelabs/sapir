@@ -666,7 +666,7 @@ impl<F: PrimeField> ConstraintSystem<F> {
                 self.wires[out.index] =
                     self.wires[w1.index] * self.wires[w2.index] + self.wires[w3.index];
             } else {
-                // w1 * w2 - w3 = 0
+                // w1 * w2 - ((-1 * w3) + out)  = 0
                 let con = self.next_constraint_offset();
 
                 let a_key = con + w1.index;
@@ -1060,7 +1060,7 @@ impl<F: PrimeField> ConstraintSystem<F> {
         (synthesizer)(self);
 
         if self.mode == Mode::ConstraintsGen {
-            self.num_constraints = Some(self.next_constraint - 1);
+            self.num_constraints = Some(self.next_constraint);
         }
     }
 
@@ -1097,6 +1097,7 @@ impl<F: PrimeField> ConstraintSystem<F> {
         }
 
         // Check rest of the constraints
+        println!("num_constraints {}", self.num_constraints.unwrap());
 
         for con in 1..self.num_constraints.unwrap() {
             let offset = con * self.z_len();
@@ -1200,10 +1201,10 @@ mod tests {
     #[test]
     fn test_valid_witness() {
         let (synthesizer, pub_inputs, priv_inputs, _) = synthetic_circuit();
-        let mut cs = ConstraintSystem::<F>::new();
+        let mut cs = ConstraintSystem::<_>::new();
         cs.set_constraints(&synthesizer);
 
-        let witness = cs.gen_witness(&synthesizer, &pub_inputs, &priv_inputs);
+        let witness: Vec<F> = cs.gen_witness(&synthesizer, &pub_inputs, &priv_inputs);
 
         assert!(cs.is_sat(&witness, &pub_inputs));
     }
@@ -1233,4 +1234,77 @@ mod tests {
 
         assert_eq!(cs.is_sat(&witness, &pub_inputs), false);
     }
+
+    // ########################################
+    // ########## Test for the operations ############
+    // ########################################
+
+    fn test_circuit<F: PrimeField>(
+        synthesizer: impl Fn(&mut ConstraintSystem<F>),
+        pub_inputs: &[F],
+        priv_inputs: &[F],
+    ) {
+        let mut cs = ConstraintSystem::<F>::new();
+        cs.set_constraints(&synthesizer);
+
+        let mut witness = cs.gen_witness(&synthesizer, &pub_inputs, &priv_inputs);
+
+        assert!(cs.is_sat(&witness, &pub_inputs));
+
+        // Should assert when the witness is invalid
+        for i in 0..cs.num_vars() {
+            witness[i] += F::from(1u32);
+            assert_eq!(cs.is_sat(&witness, &pub_inputs), false);
+            witness[i] -= F::from(1u32);
+        }
+
+        // Should assert when the public inputs are invalid
+        let mut pub_inputs = pub_inputs.to_vec();
+        for i in 0..pub_inputs.len() {
+            pub_inputs[i] += F::from(1u32);
+            assert_eq!(cs.is_sat(&witness, &pub_inputs), false);
+        }
+    }
+
+    #[test]
+    fn test_add() {
+        let synthesizer = |cs: &mut ConstraintSystem<_>| {
+            // a + b = c
+            let a = cs.alloc_priv_input();
+            let b = cs.alloc_priv_input();
+
+            let c = cs.add(a, b);
+            cs.expose_public(c);
+        };
+
+        let a = F::from(3u32);
+        let b = F::from(4u32);
+        let c = a + b;
+        let priv_inputs = [a, b];
+        let pub_inputs = [c];
+        test_circuit(synthesizer, &pub_inputs, &priv_inputs);
+    }
+
+    #[test]
+    fn test_mul_add() {
+        let synthesizer = |cs: &mut ConstraintSystem<_>| {
+            // a * b + c = d
+            let a = cs.alloc_priv_input();
+            let b = cs.alloc_priv_input();
+            let c = cs.alloc_priv_input();
+
+            let d = cs.mul_add(a, b, c);
+            cs.expose_public(d);
+        };
+
+        let a = F::from(3u32);
+        let b = F::from(4u32);
+        let c = F::from(5u32);
+        let d = a * b + c;
+        let priv_inputs = [a, b, c];
+        let pub_inputs = [d];
+        test_circuit(synthesizer, &pub_inputs, &priv_inputs);
+    }
+
+    // TODO: Add tests for all the operations
 }
