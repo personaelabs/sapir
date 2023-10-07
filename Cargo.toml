@@ -26,6 +26,7 @@ tokio = { version = "1", features = ["macros"], optional = true }
 hex = "0.4.3"
 num-bigint = "0.4.4"
 poseidon = { git = "https://github.com/DanTehrani/poseidon.git" }
+merkle-tree = { git = "https://github.com/personaelabs/merkle-tree.git" }
 
 [features]
 default = ["ark-std/print-trace"]

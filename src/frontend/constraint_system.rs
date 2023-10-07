@@ -1097,8 +1097,6 @@ impl<F: PrimeField> ConstraintSystem<F> {
         }
 
         // Check rest of the constraints
-        println!("num_constraints {}", self.num_constraints.unwrap());
-
         for con in 1..self.num_constraints.unwrap() {
             let offset = con * self.z_len();
             let A_eval: F = self.A_nonzero_coeffs[con - 1]

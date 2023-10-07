@@ -118,7 +118,6 @@ mod tests {
             PoseidonSpongeChip::<F, WIDTH>::new(b"test", IOPattern::new(vec![]), constants, cs);
         poseidon_sponge.absorb(&input);
         let result = poseidon_sponge.squeeze(1)[0];
-        result.println();
         cs.expose_public(result);
     }
 

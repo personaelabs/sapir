@@ -109,7 +109,6 @@ mod tests {
 
         cs.set_constraints(&synthesizer);
 
-        println!("num constraints: {:?}", cs.num_constraints);
         assert!(cs.is_sat(&witness, &pub_input));
     }
 

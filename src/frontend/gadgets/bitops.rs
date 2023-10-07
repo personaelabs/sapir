@@ -76,20 +76,26 @@ pub fn to_bits<F: PrimeField>(a: Wire<F>, field_bits: usize) -> Vec<Wire<F>> {
 
     if cs.is_witness_gen() {
         let a_assigned = cs.wires[a.index];
-        let a_bits_native = a_assigned.into_bigint().to_bits_be();
-        for i in 0..field_bits {
-            cs.wires[bits[i].index] = F::from(a_bits_native[i]);
+        let a_bytes = a_assigned.into_bigint().to_bytes_be();
+        for (i, b) in a_bytes.iter().enumerate() {
+            // Little-endian bits
+            for j in 0..8 {
+                let bit = if (*b >> j) & 1 == 1 { F::ONE } else { F::ZERO };
+                cs.wires[bits[i * 8 + j].index] = bit;
+            }
         }
     }
 
     let mut sum = cs.zero();
 
     let mut pow = F::ONE;
-    for a_i in bits.iter().rev() {
-        let term = cs.mul_const(*a_i, pow);
-        sum += term;
+    for (i, byte) in bits.chunks(8).rev().enumerate() {
+        let mut byte = byte.to_vec();
+        byte.reverse();
+        let term = from_bits(&byte);
+        sum += cs.mul_const(term, pow);
 
-        pow *= F::from(2u32);
+        pow = F::from(2u32).pow(&[8 * ((i + 1) as u64)]);
     }
 
     cs.assert_equal(a, sum, "to_bits failed");

@@ -23,8 +23,6 @@ pub fn ec_mul<F: PrimeField>(
         current = ec_double(current, cs);
     }
 
-    result.x.println();
-
     result
 }
 
