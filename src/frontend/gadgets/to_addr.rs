@@ -1,6 +1,7 @@
 use crate::frontend::constraint_system::Wire;
+use crate::frontend::gadgets::bitops::{from_bits, not_a_and_b_64, rotate_left_64, xor_64};
 use ark_ff::PrimeField;
-use num_bigint::BigUint;
+use std::ops::Add;
 
 // Keccak256 parameters in bits
 pub const ROUNDS: usize = 24;
@@ -45,8 +46,6 @@ pub const RC: [u64; ROUNDS] = [
     0x80000001u64,
     0x8000000080008008u64,
 ];
-
-use crate::frontend::gadgets::bitops::{from_bits, not_a_and_b_64, rotate_left_64, xor_64};
 
 pub fn to_addr<F: PrimeField>(input: [Wire<F>; 512]) -> Wire<F> {
     let cs = input[0].cs();
@@ -156,21 +155,26 @@ pub fn to_addr<F: PrimeField>(input: [Wire<F>; 512]) -> Wire<F> {
     }
 
     let mut address_bits = vec![];
-    address_bits.extend_from_slice(&state[1][32..]);
-    address_bits.extend_from_slice(&state[2]);
-    address_bits.extend_from_slice(&state[3]);
+    let state_1 = state[1][32..].to_vec();
+    let state_2 = state[2].to_vec();
+    let state_3 = state[3].to_vec();
 
-    let state_0 =
-        from_bits(&address_bits[..64]) * cs.alloc_const(F::from(BigUint::from(1u32) << 128));
-    let state_1 =
-        from_bits(&address_bits[64..128]) * cs.alloc_const(F::from(BigUint::from(1u32) << 64));
+    address_bits.extend_from_slice(&state_1);
+    address_bits.extend_from_slice(&state_2);
+    address_bits.extend_from_slice(&state_3);
 
-    let mut state_2_tmp = vec![cs.zero(); 32];
-    state_2_tmp.extend_from_slice(&address_bits[128..]);
+    let mut out = cs.zero();
+    let mut pow = F::ONE;
+    for (i, bytes) in address_bits.chunks(8).rev().enumerate() {
+        let mut bytes = bytes.to_vec();
+        bytes.reverse();
+        let byte = from_bits(&bytes);
+        let term = cs.mul_const(byte, pow);
+        out = out.add(term);
 
-    let state_2 = from_bits(&state_2_tmp);
+        pow = F::from(2u32).pow(&[8 * ((i + 1) as u64)]);
+    }
 
-    let out = state_0 + state_1 + state_2;
     out
 }
 
@@ -179,6 +183,7 @@ mod tests {
     use super::*;
     use crate::frontend::constraint_system::ConstraintSystem;
     use ark_ff::Field;
+    use num_bigint::BigUint;
     type F = ark_secq256k1::Fr;
 
     fn to_addr_circuit<F: PrimeField>(cs: &mut ConstraintSystem<F>) {
@@ -191,10 +196,10 @@ mod tests {
     #[test]
     fn test_to_addr() {
         // Public key which underlies dantehrani.eth
-        let pub_key_str = "0x765b012d6340fd3baf3068e3e118a68a559b832af2d9ddd05585fedcf9f9c2a95a65f71708281d9e1517e28c3643fa932d7675a233d8cc4edc3440c10684cd95";
+        let pub_key_str = "765b012d6340fd3baf3068e3e118a68a559b832af2d9ddd05585fedcf9f9c2a95a65f71708281d9e1517e28c3643fa932d7675a233d8cc4edc3440c10684cd95";
         let pub_key_bytes = hex::decode(pub_key_str).unwrap();
 
-        let expected_address_str = "0x400ea6522867456e988235675b9cb5b1cf5b79c8";
+        let expected_address_str = "400ea6522867456e988235675b9cb5b1cf5b79c8";
         let expected_address = hex::decode(expected_address_str).unwrap();
 
         let pub_key_bits = pub_key_bytes
@@ -218,9 +223,7 @@ mod tests {
         let mut cs = ConstraintSystem::new();
 
         let priv_input = pub_key_bits;
-        // Take the last 20 bytes
         let addr = F::from(BigUint::from_bytes_be(&expected_address));
-        // let addr = F::from(BigUint::from_bytes_le(&keccak256(&pub_key_bytes)));
         let pub_input = [addr];
 
         let witness = cs.gen_witness(synthesizer, &pub_input, &priv_input);

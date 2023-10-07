@@ -56,7 +56,6 @@ pub fn bit_xor<F: PrimeField>(a: Wire<F>, b: Wire<F>) -> Wire<F> {
 // Interprets the bits as LSB first.
 pub fn from_bits<F: PrimeField>(bits: &[Wire<F>]) -> Wire<F> {
     let cs = bits[0].cs();
-    assert_eq!(bits.len(), 64);
     let mut terms = Vec::with_capacity(64);
 
     let mut pow = F::from(1u32);
@@ -116,8 +115,8 @@ mod tests {
         };
 
         let mut bits = vec![Fp::ZERO; 256];
-        bits[0] = Fp::ONE;
-        let expected = Fp::ONE;
+        bits[253] = Fp::ONE;
+        let expected = Fp::from(4);
 
         let priv_input = bits;
         let pub_input = vec![expected];
