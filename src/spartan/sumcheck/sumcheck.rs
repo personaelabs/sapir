@@ -173,7 +173,9 @@ pub fn prove_sum<C: CurveGroup>(
                     comb_input.push(table_eval);
                 }
 
-                evals[i] += comb_func(&comb_input);
+                if !comb_input.iter().all(|x| *x == ScalarField::<C>::ZERO) {
+                    evals[i] += comb_func(&comb_input);
+                }
 
                 let mut blinder_eval = bounded_eval;
                 blinder_eval += blinder_poly.uni_polys[j].eval_small(*eval_at);
