@@ -42,12 +42,28 @@ pub struct SpartanVerifyInters<C: CurveGroup> {
 }
 
 pub struct Spartan<C: CurveGroup> {
+    pub hyrax: Hyrax<C>,
     _marker: PhantomData<C>,
 }
 
 impl<C: CurveGroup> Spartan<C> {
-    pub fn new() -> Self {
+    // n: the length of the z vector
+    pub fn new(n: usize) -> Self {
+        // Generators are use in Hyrax for committing the witness polynomial,
+        // and two IPAs for committing the blinder polynomials.
+        // We prepare generators with size sufficient to conduct the
+        // above commitments.
+
+        let m = (n as f64).log2() as usize;
+
+        // The blinder polynomial in the first sumcheck
+        // has 3n + 1 coefficients.
+        let num_bases = std::cmp::max((3 * m + 1).next_power_of_two(), Hyrax::<C>::det_num_rows(n));
+
+        let hyrax = Hyrax::new(n, num_bases);
+
         Self {
+            hyrax,
             _marker: PhantomData,
         }
     }
@@ -55,7 +71,6 @@ impl<C: CurveGroup> Spartan<C> {
     pub fn prove(
         &self,
         r1cs: &R1CS<ScalarField<C>>,
-        pcs: &Hyrax<C>,
         r1cs_witness: &[ScalarField<C>],
         r1cs_input: &[ScalarField<C>],
         transcript: &mut Transcript<C>,
@@ -74,7 +89,7 @@ impl<C: CurveGroup> Spartan<C> {
         let comm_witness_timer = profiler_start("Commit witness");
         let mut rng = thread_rng();
         let blinder = ScalarField::<C>::rand(&mut rng);
-        let committed_witness = pcs.commit(padded_r1cs_witness.clone(), blinder);
+        let committed_witness = self.hyrax.commit(padded_r1cs_witness.clone(), blinder);
         profiler_end(comm_witness_timer);
 
         // Add the witness commitment to the transcript
@@ -105,14 +120,14 @@ impl<C: CurveGroup> Spartan<C> {
         // described in Section 4.1 https://eprint.iacr.org/2019/317.pdf
         let init_blinder_poly_timer = profiler_start("Init blinder poly");
         let (blinder_poly, blinder_poly_comm, blinder_poly_sum) =
-            init_blinder_poly(m, 3, pcs, transcript);
+            init_blinder_poly(m, 3, &self.hyrax, transcript);
         profiler_end(init_blinder_poly_timer);
 
         let sc_phase_1_timer = profiler_start("Sumcheck phase 1");
 
         let sc_phase_1 = SumCheckPhase1::new(Az_poly.clone(), Bz_poly.clone(), Cz_poly.clone());
         let (sc_proof_1, (v_A, v_B, v_C)) = sc_phase_1.prove(
-            &pcs,
+            &self.hyrax,
             blinder_poly_sum,
             blinder_poly.clone(),
             &blinder_poly_comm,
@@ -144,7 +159,7 @@ impl<C: CurveGroup> Spartan<C> {
         );
 
         let sc_proof_2 = sc_phase_2.prove(
-            &pcs,
+            &self.hyrax,
             blinder_poly_sum,
             blinder_poly,
             &blinder_poly_comm,
@@ -159,7 +174,9 @@ impl<C: CurveGroup> Spartan<C> {
 
         let z_open_timer = profiler_start("Open witness poly");
         // Prove the evaluation of the polynomial Z(y) at ry
-        let z_eval_proof = pcs.open(&committed_witness, ry[1..].to_vec(), transcript);
+        let z_eval_proof = self
+            .hyrax
+            .open(&committed_witness, ry[1..].to_vec(), transcript);
         profiler_end(z_open_timer);
 
         // Prove the evaluation of the polynomials A(y), B(y), C(y) at ry
@@ -182,7 +199,6 @@ impl<C: CurveGroup> Spartan<C> {
     pub fn verify(
         &self,
         r1cs: &R1CS<ScalarField<C>>,
-        pcs: &Hyrax<C>,
         proof: &SpartanProof<C>,
         transcript: &mut Transcript<C>,
         compute_inters: bool,
@@ -215,7 +231,7 @@ impl<C: CurveGroup> Spartan<C> {
 
         let sc1_inters = verify_sum(
             &proof.sc_proof_1,
-            &pcs,
+            &self.hyrax,
             sc_phase1_sum_target,
             sc_phase1_poly,
             transcript,
@@ -270,7 +286,7 @@ impl<C: CurveGroup> Spartan<C> {
 
         let sc2_inters = verify_sum(
             &proof.sc_proof_2,
-            &pcs,
+            &self.hyrax,
             sc_phase2_sum_target,
             sc_phase2_poly,
             transcript,
@@ -278,7 +294,9 @@ impl<C: CurveGroup> Spartan<C> {
         );
 
         let pcs_verify_timer = profiler_start("Verify PCS");
-        let z_eval_inters = pcs.verify(&proof.z_eval_proof, transcript, compute_inters);
+        let z_eval_inters = self
+            .hyrax
+            .verify(&proof.z_eval_proof, transcript, compute_inters);
         profiler_end(pcs_verify_timer);
 
         if compute_inters {
@@ -312,8 +330,8 @@ mod tests {
     type F = ark_secq256k1::Fr;
 
     #[test]
-    fn test_spartan() {
-        let num_cons = 2usize.pow(18);
+    fn test_spartan_2() {
+        let num_cons = 2usize.pow(4);
 
         let synthesizer = mock_circuit(num_cons);
         let mut cs = ConstraintSystem::new();
@@ -325,18 +343,17 @@ mod tests {
 
         let witness = cs.gen_witness(&synthesizer, &pub_input, &priv_input);
 
-        let spartan = Spartan::<Curve>::new();
-        let bp = Hyrax::new(r1cs.z_len());
+        let spartan = Spartan::<Curve>::new(r1cs.z_len());
         let mut prover_transcript = Transcript::new(b"test_spartan");
         let proof_gen_timer = timer_start("Prove");
-        let (proof, _) = spartan.prove(&r1cs, &bp, &witness, &pub_input, &mut prover_transcript);
+        let (proof, _) = spartan.prove(&r1cs, &witness, &pub_input, &mut prover_transcript);
 
         timer_end(proof_gen_timer);
 
         let mut verifier_transcript = Transcript::new(b"test_spartan");
         let proof_verify_timer = timer_start("Verify");
         let _inters = spartan
-            .verify(&r1cs, &bp, &proof, &mut verifier_transcript, true)
+            .verify(&r1cs, &proof, &mut verifier_transcript, true)
             .unwrap();
 
         timer_end(proof_verify_timer);

@@ -33,8 +33,6 @@ macro_rules! circuit {
     ($synthesizer:expr, $curve:ty) => {
         static CIRCUIT: Mutex<R1CS<ScalarField<$curve>>> = Mutex::new(R1CS::empty());
 
-        static PCS: Mutex<Hyrax<$curve>> = Mutex::new(Hyrax::empty());
-
         static CONSTRAINT_SYSTEM: Mutex<ConstraintSystem<ScalarField<$curve>>> =
             Mutex::new(ConstraintSystem::new());
 
@@ -54,13 +52,6 @@ macro_rules! circuit {
                 web_sys::console::log_1(&JsValue::from_str("Num constraints:"));
                 web_sys::console::log_1(&JsValue::from_f64(cs.num_constraints.unwrap() as f64));
             }
-
-            // ################################
-            // Load the Hyrax generators
-            // ################################
-
-            let mut pcs = PCS.lock().unwrap();
-            *pcs = Hyrax::new(circuit.z_len())
         }
 
         pub fn prove(
@@ -73,22 +64,19 @@ macro_rules! circuit {
             let witness = cs.gen_witness($synthesizer, pub_input, priv_input);
 
             // Generate the proof
-            let spartan = Spartan::new();
-            let bp = PCS.lock().unwrap().clone();
+            let spartan = Spartan::new(circuit.z_len());
             let mut transcript = Transcript::new(b"Spartan");
 
-            let proof = spartan.prove(&circuit, &bp, &witness, pub_input, &mut transcript);
+            let proof = spartan.prove(&circuit, &witness, pub_input, &mut transcript);
             proof.0
         }
 
         pub fn verify(proof: SpartanProof<$curve>) -> bool {
             let circuit = CIRCUIT.lock().unwrap().clone();
 
-            let spartan = Spartan::new();
-            let bp = PCS.lock().unwrap().clone();
+            let spartan = Spartan::new(circuit.z_len());
             let mut transcript = Transcript::new(b"Spartan");
-
-            spartan.verify(&circuit, &bp, &proof, &mut transcript, false);
+            spartan.verify(&circuit, &proof, &mut transcript, false);
 
             true
         }

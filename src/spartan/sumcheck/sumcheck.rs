@@ -324,7 +324,7 @@ mod tests {
         let mut prover_transcript = Transcript::<Curve>::new(b"test_sumcheck");
         let mut verifier_transcript = prover_transcript.clone();
 
-        let bp = Hyrax::new(poly_num_entries);
+        let bp = Hyrax::new(poly_num_entries, poly_num_entries);
 
         let eval_table_1 = (0..poly_num_entries)
             .map(|i| Fp::from((i + 333) as u64))

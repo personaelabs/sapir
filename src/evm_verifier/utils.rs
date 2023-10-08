@@ -51,14 +51,14 @@ pub fn build_ip_proof<C: CurveGroup>(
     inters: IPAInters<C>,
 ) -> EvmInnerProductProof {
     EvmInnerProductProof {
-        a: to_u256(ip_proof.a),
         y: to_u256(ip_proof.y),
         comm: to_evm_point(ip_proof.comm),
         l: to_evm_points_vec(&ip_proof.L_vec),
         r: to_evm_points_vec(&ip_proof.R_vec),
-        s_ag_powers: to_evm_points_vec(&inters.sa_G_inters),
-        s_bg_powers: to_evm_points_vec(&inters.sb_H_inters),
-        bh_powers: to_evm_points_vec(&inters.b_H_inters),
+        z_1: to_u256(ip_proof.z1),
+        z_2: to_u256(ip_proof.z2),
+        r_zko: to_evm_point(ip_proof.R),
+        s_g_powers: to_evm_points_vec(&inters.s_G_inters),
     }
 }
 
@@ -115,7 +115,7 @@ impl<C: CurveGroup> ToEvmVal for Gens<C> {
     fn to_evm_val(&self) -> Self::EvmVal {
         EvmGens {
             g: to_evm_points_vec(&self.G),
-            h: vec![],
+            h: to_evm_point(self.H.unwrap()),
             u: to_evm_point(self.u.unwrap()),
         }
     }

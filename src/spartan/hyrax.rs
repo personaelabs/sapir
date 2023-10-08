@@ -48,7 +48,24 @@ pub struct PolyEvalProofInters<C: CurveGroup> {
 }
 
 impl<C: CurveGroup> Hyrax<C> {
-    pub fn new(n: usize) -> Self {
+    // TODO: Make it cleaner by not taking `num_bases` as input here
+    pub fn new(n: usize, num_bases: usize) -> Self {
+        let bp = Bulletproof::new(num_bases);
+
+        let padded_num_cols = Self::det_num_cols(n);
+        let padded_num_rows = Self::det_num_rows(n);
+        let padded_n = padded_num_cols * padded_num_rows;
+        let n_padded_log2 = (padded_n as f64).log2() as usize;
+
+        Self {
+            bp,
+            padded_num_cols: padded_num_cols,
+            padded_num_rows: padded_num_rows,
+            padded_num_vrs: n_padded_log2,
+        }
+    }
+
+    pub fn det_num_rows(n: usize) -> usize {
         assert!(n.is_power_of_two());
 
         let mut n_padded_log2 = (n as f64).log2() as usize;
@@ -57,20 +74,14 @@ impl<C: CurveGroup> Hyrax<C> {
         if n_padded_log2 & 1 == 1 {
             n_padded_log2 += 1;
         }
-        let padded_num_rows = 2usize.pow((n_padded_log2 / 2) as u32);
-        let padded_num_cols = padded_num_rows;
-        assert_eq!(
-            padded_num_rows * padded_num_cols,
-            2usize.pow(n_padded_log2 as u32)
-        );
 
-        let bp = Bulletproof::new(std::cmp::max(padded_num_rows, padded_num_cols));
-        Self {
-            bp,
-            padded_num_cols: padded_num_cols,
-            padded_num_rows: padded_num_rows,
-            padded_num_vrs: n_padded_log2,
-        }
+        let padded_num_rows = 2usize.pow((n_padded_log2 / 2) as u32);
+
+        padded_num_rows
+    }
+
+    pub fn det_num_cols(n: usize) -> usize {
+        Self::det_num_rows(n)
     }
 
     pub const fn empty() -> Self {
@@ -242,7 +253,7 @@ mod tests {
         let x = (0..m).map(|i| F::from((i + 22) as u64)).collect::<Vec<F>>();
         let y = poly.eval(&x);
 
-        let hyrax = Hyrax::<Curve>::new(n);
+        let hyrax = Hyrax::<Curve>::new(n, n);
         let blinder = F::from(3);
         let comm_timer = timer_start("Commit");
         let comm = hyrax.commit(a, blinder);

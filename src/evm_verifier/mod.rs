@@ -3,7 +3,7 @@ mod spartan_verifier_test;
 mod utils;
 use crate::{
     r1cs::R1CS,
-    wasm::wasm_deps::{Hyrax, Spartan, SpartanProof, Transcript},
+    wasm::wasm_deps::{Spartan, SpartanProof, Transcript},
     ScalarField,
 };
 use ark_ec::CurveGroup;
@@ -12,18 +12,17 @@ use std::sync::Arc;
 pub use utils::*;
 
 pub fn generate_submit_proof_input<C: CurveGroup>(
-    pcs: &Hyrax<C>,
     proof: SpartanProof<C>,
     r1cs: &R1CS<ScalarField<C>>,
     contract_address: &[u8],
 ) -> Vec<u8> {
-    let spartan = Spartan::<C>::new();
+    let spartan = Spartan::<C>::new(r1cs.z_len());
 
     let mut transcript = Transcript::new(b"Spartan");
 
     // Compute the intermediate values
     let inters = spartan
-        .verify(&r1cs, pcs, &proof, &mut transcript, true)
+        .verify(&r1cs, &proof, &mut transcript, true)
         .unwrap();
 
     let contract_address: [u8; 20] = contract_address.try_into().unwrap();
@@ -91,13 +90,11 @@ mod tests {
 
         let r1cs = cs.to_r1cs();
 
-        let spartan = Spartan::<Curve>::new();
-        let hyrax = Hyrax::new(r1cs.z_len());
+        let spartan = Spartan::<Curve>::new(r1cs.z_len());
         let mut transcript = Transcript::new(b"Spartan");
-        let (proof, _) = spartan.prove(&r1cs, &hyrax, &witness, &pub_input, &mut transcript);
+        let (proof, _) = spartan.prove(&r1cs, &witness, &pub_input, &mut transcript);
 
         let _input = generate_submit_proof_input(
-            &hyrax,
             proof,
             &r1cs,
             &hex::decode("5FbDB2315678afecb367f032d93F642f64180aa3").unwrap(),

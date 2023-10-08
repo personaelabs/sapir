@@ -19,15 +19,14 @@ pub struct InnerProductProof<C: CurveGroup> {
     pub y: ScalarField<C>,
     pub L_vec: Vec<C>,
     pub R_vec: Vec<C>,
-    pub a: ScalarField<C>,
-    pub r_prime: ScalarField<C>,
+    pub R: C,
+    pub z1: ScalarField<C>,
+    pub z2: ScalarField<C>,
 }
 
 #[derive(Clone)]
 pub struct IPAInters<C: CurveGroup> {
-    pub sa_G_inters: Vec<C>,
-    pub sb_H_inters: Vec<C>,
-    pub b_H_inters: Vec<C>,
+    pub s_G_inters: Vec<C>,
 }
 
 pub struct IPAComm<C: CurveGroup> {
@@ -120,6 +119,14 @@ impl<C: CurveGroup> Bulletproof<C> {
         let mut b = b;
         let mut ck = self.gens.clone();
 
+        // Send the claimed evaluation
+        transcript.append_fe(y);
+        // Get a challenge the rescale the basis
+        let x = transcript.challenge_fe("x".to_string());
+
+        // Rescale `u`
+        ck.u = Some(ck.u.unwrap() * x);
+
         let num_rounds = (n as f64).log2() as usize;
 
         let mut n_prime = n / 2;
@@ -193,7 +200,6 @@ impl<C: CurveGroup> Bulletproof<C> {
             n_prime = n / 2;
         }
 
-        // ZK-open the final a and the blind factor
         let mut r_prime = ScalarField::<C>::ZERO;
 
         for (u_i, l_i) in u_vec.iter().zip(l_vec.iter()) {
@@ -208,19 +214,36 @@ impl<C: CurveGroup> Bulletproof<C> {
 
         // Prove knowledge of a[0] and r_prime
 
+        let d = ScalarField::<C>::rand(&mut rng);
+        let s = ScalarField::<C>::rand(&mut rng);
+
+        // Sanity checks
         assert_eq!(a.len(), 1);
         assert_eq!(b.len(), 1);
         assert_eq!(L_vec.len(), num_rounds);
         assert_eq!(R_vec.len(), num_rounds);
+
+        // Zero-knowledge proof of knowledge of a[0] and r_prime
+        let G_final = ck.G[0];
+        let b_final = b[0];
+        let a_final = a[0];
+        let R = (G_final + (ck.u.unwrap() * b_final).into_affine()) * d + (ck.H.unwrap() * s);
+
+        transcript.append_point(R);
+        let c = transcript.challenge_fe("c".to_string());
+
+        let z1 = d + (c * a_final);
+        let z2 = s + (c * r_prime);
 
         InnerProductProof {
             comm: comm_a.comm,
             L_vec,
             R_vec,
             b: b_vec,
-            a: a[0],
             y,
-            r_prime,
+            R,
+            z1,
+            z2,
         }
     }
 
@@ -260,6 +283,13 @@ impl<C: CurveGroup> Bulletproof<C> {
     ) -> Option<IPAInters<C>> {
         let n = proof.b.len();
 
+        // Append the claimed evaluation to the transcript
+        transcript.append_fe(proof.y);
+
+        // Rescale `u`
+        let x = transcript.challenge_fe("x".to_string());
+        let u = self.gens.u.unwrap() * x;
+
         // Get all the challenges from the transcript
         let r = proof
             .L_vec
@@ -280,8 +310,6 @@ impl<C: CurveGroup> Bulletproof<C> {
 
         let s = Self::compute_scalars(&r, &r_inv, n);
 
-        let s_a = Self::scale_vec(&s, proof.a);
-
         let mut b_folded = proof.b.clone();
         for (r_i, r_inv_i) in r.iter().zip(r_inv.iter()) {
             b_folded = Self::fold(&b_folded, *r_inv_i, *r_i);
@@ -292,37 +320,33 @@ impl<C: CurveGroup> Bulletproof<C> {
 
         let b = b_folded[0];
 
-        //let s_b = Self::scale_vec(&s_inv, b);
-        let a_b = proof.a * b;
-
         let inters = if compute_inters {
-            let sa_G_inters = msm_powers(&s_a, &self.gens.G[..s_a.len()]);
-            let sb_H_inters = vec![];
-            let b_H_inters = vec![];
+            let s_G_inters = msm_powers(&s, &self.gens.G[..s.len()]);
 
-            Some(IPAInters {
-                sa_G_inters,
-                sb_H_inters,
-                b_H_inters,
-            })
+            Some(IPAInters { s_G_inters })
         } else {
             None
         };
 
-        let lhs = msm::<C>(&s_a, &self.gens.G[..s_a.len()])
-            + self.gens.H.unwrap() * proof.r_prime
-            + self.gens.u.unwrap() * a_b;
+        let G_final = msm::<C>(&s, &self.gens.G[..s.len()]);
 
-        // Compute P
-        let mut rhs = proof.comm + self.gens.u.unwrap() * proof.y;
+        // Compute Q
+        let mut Q = proof.comm + u * proof.y;
 
         for (r_i, L_i) in r.iter().zip(proof.L_vec.iter()) {
-            rhs += *L_i * (r_i.square());
+            Q += *L_i * (r_i.square());
         }
 
         for (r_inv_i, R_i) in r_inv.iter().zip(proof.R_vec.iter()) {
-            rhs += *R_i * (r_inv_i.square());
+            Q += *R_i * (r_inv_i.square());
         }
+
+        // Verify the zero-knowledge opening
+        transcript.append_point(proof.R);
+        let c = transcript.challenge_fe("c".to_string());
+
+        let lhs = (Q * c).into_affine() + proof.R;
+        let rhs = (G_final + (u * b).into_affine()) * proof.z1 + self.gens.H.unwrap() * proof.z2;
 
         assert_eq!(lhs.into_affine(), rhs.into_affine());
 

@@ -3,7 +3,7 @@ mod tests {
     use super::super::utils::test_utils::*;
     use super::super::utils::*;
     use crate::spartan::spartan::Spartan;
-    use crate::wasm::wasm_deps::{Hyrax, Transcript};
+    use crate::wasm::wasm_deps::Transcript;
     use crate::{constraint_system::ConstraintSystem, mock_circuit};
     use ark_std::{end_timer, start_timer};
     use ethers::prelude::*;
@@ -36,17 +36,16 @@ mod tests {
         let witness = cs.gen_witness(synthesizer, &pub_input, &priv_input);
 
         // Generate a Spartan proof
-        let spartan = Spartan::<Curve>::new();
-        let hyrax = Hyrax::new(r1cs.z_len());
+        let spartan = Spartan::<Curve>::new(r1cs.z_len());
         let mut transcript = Transcript::new(b"spartan_verifier_test");
         let prover_timer = start_timer!(|| "Prove");
-        let (proof, _) = spartan.prove(&r1cs, &hyrax, &witness, &pub_input, &mut transcript);
+        let (proof, _) = spartan.prove(&r1cs, &witness, &pub_input, &mut transcript);
         end_timer!(prover_timer);
 
         // Verify the proof
         let mut verifier_transcript = Transcript::new(b"spartan_verifier_test");
         let inters = spartan
-            .verify(&r1cs, &hyrax, &proof, &mut verifier_transcript, true)
+            .verify(&r1cs, &proof, &mut verifier_transcript, true)
             .unwrap();
 
         // Submit the proof
@@ -93,7 +92,7 @@ mod tests {
             step: 0,
         };
 
-        let gens = hyrax.bp.gens.clone().to_evm_val();
+        let gens = spartan.hyrax.bp.gens.clone().to_evm_val();
 
         // Verify the proof
         let mut tx =
