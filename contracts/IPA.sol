@@ -4,11 +4,12 @@ pragma solidity ^0.8.9;
 import "./Secq256k1.sol";
 import "./Transcript.sol";
 import "./FF.sol";
+import "../lib/forge-std/src/console.sol";
 
 // Generators for the Pedersen commitment
 struct EvmGens {
     EvmAffinePoint[] G;
-    EvmAffinePoint[] H;
+    EvmAffinePoint H;
     EvmAffinePoint u;
 }
 
@@ -17,10 +18,10 @@ struct EvmInnerProductProof {
     EvmAffinePoint comm;
     EvmAffinePoint[] L;
     EvmAffinePoint[] R;
-    EvmAffinePoint[] sAGPowers;
-    EvmAffinePoint[] sBGPowers;
-    EvmAffinePoint[] bhPowers;
-    uint256 a;
+    EvmAffinePoint[] sGPowers;
+    EvmAffinePoint R_zko;
+    uint256 z1;
+    uint256 z2;
     uint256 y;
 }
 
@@ -113,9 +114,18 @@ contract IPA is Secq256k1, Transcript {
         EvmGens memory gens,
         bytes32 state
     ) public returns (bool) {
-        // TODO: TBD
         uint256 n = b.length;
         uint256 m = proof.L.length;
+
+        // Rescale `u`
+        Transcript.apepnd_uint256(state, proof.y);
+        uint256 x = Transcript.challenge_scalar(state);
+        EvmProjectivePoint memory u = Secq256k1.toProjective(gens.u);
+        u = Secq256k1.mul(u, x);
+
+        console.log("n: %s", n);
+        console.log("m: %s", m);
+        console.log("u.x: %s", u.x);
 
         uint256[] memory r = Transcript.challenge_vec(state, proof.L.length);
         // Check that the provided rInvs are correct
@@ -126,12 +136,7 @@ contract IPA is Secq256k1, Transcript {
 
         uint256[] memory s = copmuteScalars(r, rInv, n, m);
 
-        // Check that the provided sInvs are correct
-        uint256[] memory sInv = new uint256[](n);
-        for (uint256 i = 0; i < n; i++) {
-            sInv[i] = Secq256k1.invMod(s[i], Fq.MODULUS);
-        }
-
+        // Compute the folded `b`
         uint256[] memory bFolded = b;
         for (uint256 i = 0; i < m; i++) {
             bFolded = fold(bFolded, rInv[i], r[i]);
@@ -139,21 +144,77 @@ contract IPA is Secq256k1, Transcript {
 
         uint256 bFinal = bFolded[0];
 
-        uint256[] memory sa = scaleVec(s, proof.a);
-        uint256[] memory sb = scaleVec(sInv, bFinal);
+        console.log("G.len() %s", gens.G.length);
+        console.log("s.len() %s", s.length);
+        // Compute the folded G
+        // EvmProjectivePoint memory G = Secq256k1.msm_naive(gens.G, s);
+        EvmProjectivePoint memory G = Secq256k1.sum(proof.sGPowers);
 
-        uint256 ab = proof.a.mul(bFinal);
+        // Compute Q
 
-        // TODO: Add MSM term checks
-        EvmProjectivePoint memory sa_G = Secq256k1.sum(proof.sAGPowers);
-        EvmProjectivePoint memory sb_H = Secq256k1.sum(proof.sBGPowers);
-        EvmProjectivePoint memory bH = Secq256k1.sum(proof.bhPowers);
-
-        // lhs = sa * G + sb * H + u * ab
-        EvmProjectivePoint memory lhs = Secq256k1.add(
-            Secq256k1.add(sa_G, sb_H),
-            Secq256k1.mul(Secq256k1.toProjective(gens.u), ab)
+        EvmProjectivePoint memory Q = Secq256k1.add(
+            Secq256k1.toProjective(proof.comm),
+            Secq256k1.mul(u, proof.y)
         );
+
+        uint256[] memory rSquared = new uint256[](m);
+        for (uint256 i = 0; i < m; i++) {
+            rSquared[i] = r[i].mul(r[i]);
+        }
+
+        uint256[] memory rInvSquared = new uint256[](m);
+        for (uint256 i = 0; i < m; i++) {
+            rInvSquared[i] = rInv[i].mul(rInv[i]);
+        }
+
+        EvmProjectivePoint memory Lr = Secq256k1.msm_naive(proof.L, rSquared);
+
+        EvmProjectivePoint memory RrInv = Secq256k1.msm_naive(
+            proof.R,
+            rInvSquared
+        );
+
+        Q = Secq256k1.add(Secq256k1.add(Lr, RrInv), Q);
+
+        // Verify the zero-knowledge opening
+        Transcript.append_point(state, Secq256k1.toProjective(proof.R_zko));
+        uint256 c = Transcript.challenge_scalar(state);
+
+        // let lhs = (Q * c).into_affine() + proof.R;
+        EvmProjectivePoint memory lhs = Secq256k1.add(
+            Secq256k1.mul(Q, c),
+            Secq256k1.toProjective(proof.R_zko)
+        );
+
+        // let rhs = (G + (u * b).into_affine()) * proof.z1 + self.gens.H.unwrap() * proof.z2;
+        // rhs = u * b
+        EvmProjectivePoint memory rhs = Secq256k1.mul(u, bFinal);
+        // rhs = G + (u * b)
+        rhs = Secq256k1.add(G, rhs);
+        // rhs = (G + (u * b)) * z1
+        rhs = Secq256k1.mul(rhs, proof.z1);
+        // rhs = (G + (u * b)) * z1 + H * z2
+        rhs = Secq256k1.add(
+            rhs,
+            Secq256k1.mul(Secq256k1.toProjective(gens.H), proof.z2)
+        );
+
+        EvmAffinePoint memory lhsAffine = Secq256k1.toAffine(lhs);
+        EvmAffinePoint memory rhsAffine = Secq256k1.toAffine(rhs);
+
+        console.log("lhs.x: %s", lhsAffine.x);
+        console.log("lhs.y: %s", lhsAffine.y);
+        console.log("rhs.x: %s", rhsAffine.x);
+        console.log("rhs.y: %s", rhsAffine.y);
+
+        require(
+            lhsAffine.x == rhsAffine.x && lhsAffine.y == rhsAffine.y,
+            "Inner product equality check failed"
+        );
+
+        /*
+        // TODO: Add MSM term checks
+        EvmProjectivePoint memory s_G = Secq256k1.sum(proof.sGPowers);
 
         // P = T_prime + bH + u * proof.y
         EvmProjectivePoint memory P = Secq256k1.add(
@@ -190,6 +251,7 @@ contract IPA is Secq256k1, Transcript {
             lhsAffine.x == rhsAffine.x && lhsAffine.y == rhsAffine.y,
             "Inner product equality check failed"
         );
+        */
 
         return true;
     }

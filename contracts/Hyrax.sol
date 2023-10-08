@@ -35,7 +35,6 @@ contract Hyrax is IPA, EqPoly {
     function verify(
         EvmPolyEvalProof memory proof,
         uint256[] memory _x,
-        OpeningVerifyAuxilaries memory auxilaries,
         EvmGens memory gens,
         bytes32 state
     ) public returns (bool) {

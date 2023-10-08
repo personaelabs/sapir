@@ -7,6 +7,7 @@ import "./IPA.sol";
 import "./Hyrax.sol";
 import "./EqPoly.sol";
 import "./Transcript.sol";
+import "./BlinderPoly.sol";
 // import "../lib/forge-std/src/console.sol";
 
 // Store the A, B, C matrices as multilinear polynomials
@@ -44,7 +45,7 @@ enum VStep {
     MatrixCEval
 }
 
-contract SpartanVerifier is SumCheck, SparseMLPoly, Hyrax {
+contract SpartanVerifier is SumCheck, SparseMLPoly, Hyrax, BlinderPoly {
     using Fq for uint256;
 
     constructor() {}
@@ -119,8 +120,13 @@ contract SpartanVerifier is SumCheck, SparseMLPoly, Hyrax {
         );
 
         // Verify the opening of the blinder polynomial
-        // TODO: Check that the auxiliary information is provided
-        IPA.verify(scProof1.blindPolyEvalProof, rx, gens, state);
+        BlinderPoly.verifyOpening(
+            scProof1.blindPolyEvalProof,
+            rx,
+            3,
+            gens,
+            state
+        );
 
         // Verify the final evaluation
         uint256 eqTauEval = EqPoly.eval(rx, tau);
@@ -171,7 +177,13 @@ contract SpartanVerifier is SumCheck, SparseMLPoly, Hyrax {
         );
 
         // Verify the opening of the blinder polynomial
-        IPA.verify(scProof1.blindPolyEvalProof, rx, gens, state);
+        BlinderPoly.verifyOpening(
+            scProof2.blindPolyEvalProof,
+            ry,
+            2,
+            gens,
+            state
+        );
 
         // Concatinate rx and ry
         uint256[] memory rxry = new uint256[](rx.length + ry.length);
@@ -227,7 +239,7 @@ contract SpartanVerifier is SumCheck, SparseMLPoly, Hyrax {
         );
 
         // Verify the witness polynomial opening
-        IPA.verify(scProof1.blindPolyEvalProof, rx, gens, state);
+        Hyrax.verify(fullProof.zEvalProof, rx, gens, state);
 
         return true;
     }

@@ -24,7 +24,7 @@ mod tests {
         let verifier_contract = SpartanVerifier::new(contract_address, client.clone());
 
         // Prepare the circuit
-        let num_cons = 2usize.pow(5);
+        let num_cons = 2usize.pow(4);
         let synthesizer = mock_circuit(num_cons);
         let mut cs = ConstraintSystem::new();
         cs.set_constraints(&synthesizer);

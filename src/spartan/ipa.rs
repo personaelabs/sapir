@@ -15,7 +15,6 @@ use super::{
 #[derive(Debug, Clone, CanonicalDeserialize, CanonicalSerialize)]
 pub struct InnerProductProof<C: CurveGroup> {
     pub comm: C,
-    pub b: Vec<ScalarField<C>>,
     pub y: ScalarField<C>,
     pub L_vec: Vec<C>,
     pub R_vec: Vec<C>,
@@ -115,7 +114,6 @@ impl<C: CurveGroup> Bulletproof<C> {
         let y = inner_prod(&a, &b);
 
         let mut a = a;
-        let b_vec = b.clone();
         let mut b = b;
         let mut ck = self.gens.clone();
 
@@ -239,7 +237,6 @@ impl<C: CurveGroup> Bulletproof<C> {
             comm: comm_a.comm,
             L_vec,
             R_vec,
-            b: b_vec,
             y,
             R,
             z1,
@@ -278,10 +275,11 @@ impl<C: CurveGroup> Bulletproof<C> {
     pub fn verify(
         &self,
         proof: &InnerProductProof<C>,
+        b: Vec<ScalarField<C>>,
         transcript: &mut Transcript<C>,
         compute_inters: bool,
     ) -> Option<IPAInters<C>> {
-        let n = proof.b.len();
+        let n = b.len();
 
         // Append the claimed evaluation to the transcript
         transcript.append_fe(proof.y);
@@ -310,7 +308,7 @@ impl<C: CurveGroup> Bulletproof<C> {
 
         let s = Self::compute_scalars(&r, &r_inv, n);
 
-        let mut b_folded = proof.b.clone();
+        let mut b_folded = b.clone();
         for (r_i, r_inv_i) in r.iter().zip(r_inv.iter()) {
             b_folded = Self::fold(&b_folded, *r_inv_i, *r_i);
         }
@@ -393,6 +391,6 @@ mod tests {
         assert_eq!(eval_proof.y, y);
 
         let mut verifier_transcript = Transcript::new(b"test");
-        bp.verify(&eval_proof, &mut verifier_transcript, false);
+        bp.verify(&eval_proof, b, &mut verifier_transcript, false);
     }
 }

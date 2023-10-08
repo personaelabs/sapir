@@ -202,8 +202,6 @@ impl<C: CurveGroup> Hyrax<C> {
         let L = EqPoly::new(x_low).evals();
         let R = EqPoly::new(x_high).evals();
 
-        assert_eq!(proof.inner_prod_proof.b, R);
-
         // Compute the intermediate powers of L * T
         let T_prime_inters = if compute_inters {
             msm_powers(&L, &proof.T)
@@ -218,7 +216,7 @@ impl<C: CurveGroup> Hyrax<C> {
 
         let bp_result = self
             .bp
-            .verify(&proof.inner_prod_proof, transcript, compute_inters);
+            .verify(&proof.inner_prod_proof, R, transcript, compute_inters);
 
         if compute_inters {
             let ip_inters = bp_result.unwrap();

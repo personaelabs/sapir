@@ -15,19 +15,19 @@
     }
   ],
   "bytecode": {
-    "object": "0x60808060405234601857607a908161001e823930815050f35b600080fdfe6080806040526004361015601257600080fd5b60003560e01c6325aa322c14602657600080fd5b6000366003190112603f576401000003d0198152602090f35b600080fdfea264697066735822122052a194dac92571c46d6686c8dc43c060249ea728dbed075f4ce26b40c61c6ac464736f6c63430008150033",
+    "object": "0x60808060405234601857607a908161001e823930815050f35b600080fdfe6080806040526004361015601257600080fd5b60003560e01c6325aa322c14602657600080fd5b6000366003190112603f576401000003d0198152602090f35b600080fdfea2646970667358221220fdaf1aac64f66c3f93f0455421db5d19859da36a2dc4a0edb19eb6a6d8c6fa9064736f6c63430008150033",
     "sourceMap": "700:559:1:-:0;;;;;;;;;;;;;;;;;;;;;",
     "linkReferences": {}
   },
   "deployedBytecode": {
-    "object": "0x6080806040526004361015601257600080fd5b60003560e01c6325aa322c14602657600080fd5b6000366003190112603f576401000003d0198152602090f35b600080fdfea264697066735822122052a194dac92571c46d6686c8dc43c060249ea728dbed075f4ce26b40c61c6ac464736f6c63430008150033",
+    "object": "0x6080806040526004361015601257600080fd5b60003560e01c6325aa322c14602657600080fd5b6000366003190112603f576401000003d0198152602090f35b600080fdfea2646970667358221220fdaf1aac64f66c3f93f0455421db5d19859da36a2dc4a0edb19eb6a6d8c6fa9064736f6c63430008150033",
     "sourceMap": "700:559:1:-:0;;;;;;;;;;;;;;;;;;;;;;;;;;;;-1:-1:-1;;700:559:1;;;;-1:-1:-1;;700:559:1;;;;;;;;",
     "linkReferences": {}
   },
   "methodIdentifiers": {
     "MODULUS()": "25aa322c"
   },
-  "rawMetadata": "{\"compiler\":{\"version\":\"0.8.21+commit.d9974bed\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[],\"name\":\"MODULUS\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"}],\"devdoc\":{\"kind\":\"dev\",\"methods\":{},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{},\"version\":1}},\"settings\":{\"compilationTarget\":{\"contracts/FF.sol\":\"Fq\"},\"evmVersion\":\"paris\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":true,\"runs\":200},\"remappings\":[\":ds-test/=lib/forge-std/lib/ds-test/src/\",\":forge-std/=lib/forge-std/src/\"],\"viaIR\":true},\"sources\":{\"contracts/FF.sol\":{\"keccak256\":\"0x303fe10478f173e0e437e557b1b30217bad0fa5036902cf96bb2ee2ed0597f9b\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://0335dfe11ee0c05a3f477717268de9ca38d345f81b6377841927909edec25357\",\"dweb:/ipfs/QmekaCeTF3oxwgQiigCG2nSUcREAK5Jef4kqovmTzVmKtr\"]}},\"version\":1}",
+  "rawMetadata": "{\"compiler\":{\"version\":\"0.8.21+commit.d9974bed\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[],\"name\":\"MODULUS\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"}],\"devdoc\":{\"kind\":\"dev\",\"methods\":{},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{},\"version\":1}},\"settings\":{\"compilationTarget\":{\"contracts/FF.sol\":\"Fq\"},\"evmVersion\":\"paris\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":true,\"runs\":200},\"remappings\":[],\"viaIR\":true},\"sources\":{\"contracts/FF.sol\":{\"keccak256\":\"0x303fe10478f173e0e437e557b1b30217bad0fa5036902cf96bb2ee2ed0597f9b\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://0335dfe11ee0c05a3f477717268de9ca38d345f81b6377841927909edec25357\",\"dweb:/ipfs/QmekaCeTF3oxwgQiigCG2nSUcREAK5Jef4kqovmTzVmKtr\"]}},\"version\":1}",
   "metadata": {
     "compiler": {
       "version": "0.8.21+commit.d9974bed"
@@ -61,10 +61,7 @@
       }
     },
     "settings": {
-      "remappings": [
-        "ds-test/=lib/forge-std/lib/ds-test/src/",
-        "forge-std/=lib/forge-std/src/"
-      ],
+      "remappings": [],
       "optimizer": {
         "enabled": true,
         "runs": 200

@@ -57,8 +57,8 @@ impl<C: CurveGroup> Spartan<C> {
         let m = (n as f64).log2() as usize;
 
         // The blinder polynomial in the first sumcheck
-        // has 3n + 1 coefficients.
-        let num_bases = std::cmp::max((3 * m + 1).next_power_of_two(), Hyrax::<C>::det_num_rows(n));
+        // has 4m + 1 coefficients.
+        let num_bases = std::cmp::max((4 * m + 1).next_power_of_two(), Hyrax::<C>::det_num_rows(n));
 
         let hyrax = Hyrax::new(n, num_bases);
 
@@ -119,7 +119,7 @@ impl<C: CurveGroup> Spartan<C> {
         // We implement the zero-knowledge sumcheck protocol
         // described in Section 4.1 https://eprint.iacr.org/2019/317.pdf
         let init_blinder_poly_timer = profiler_start("Init blinder poly");
-        let (blinder_poly, blinder_poly_comm, blinder_poly_sum) =
+        let (sc1_blinder_poly, sc1_blinder_poly_comm) =
             init_blinder_poly(m, 3, &self.hyrax, transcript);
         profiler_end(init_blinder_poly_timer);
 
@@ -128,9 +128,9 @@ impl<C: CurveGroup> Spartan<C> {
         let sc_phase_1 = SumCheckPhase1::new(Az_poly.clone(), Bz_poly.clone(), Cz_poly.clone());
         let (sc_proof_1, (v_A, v_B, v_C)) = sc_phase_1.prove(
             &self.hyrax,
-            blinder_poly_sum,
-            blinder_poly.clone(),
-            &blinder_poly_comm,
+            sc1_blinder_poly.sum,
+            sc1_blinder_poly,
+            &sc1_blinder_poly_comm,
             transcript,
         );
 
@@ -158,11 +158,14 @@ impl<C: CurveGroup> Spartan<C> {
             r.as_slice().try_into().unwrap(),
         );
 
+        let (sc2_blinder_poly, sc2_blinder_poly_comm) =
+            init_blinder_poly(m, 2, &self.hyrax, transcript);
+
         let sc_proof_2 = sc_phase_2.prove(
             &self.hyrax,
-            blinder_poly_sum,
-            blinder_poly,
-            &blinder_poly_comm,
+            sc2_blinder_poly.sum,
+            sc2_blinder_poly,
+            &sc2_blinder_poly_comm,
             transcript,
         );
 
@@ -234,6 +237,7 @@ impl<C: CurveGroup> Spartan<C> {
             &self.hyrax,
             sc_phase1_sum_target,
             sc_phase1_poly,
+            3,
             transcript,
             compute_inters,
         );
@@ -289,6 +293,7 @@ impl<C: CurveGroup> Spartan<C> {
             &self.hyrax,
             sc_phase2_sum_target,
             sc_phase2_poly,
+            2,
             transcript,
             compute_inters,
         );
@@ -331,7 +336,7 @@ mod tests {
 
     #[test]
     fn test_spartan_2() {
-        let num_cons = 2usize.pow(4);
+        let num_cons = 2usize.pow(3);
 
         let synthesizer = mock_circuit(num_cons);
         let mut cs = ConstraintSystem::new();
