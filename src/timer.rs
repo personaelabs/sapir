@@ -2,11 +2,19 @@ use ark_std::end_timer;
 use ark_std::perf_trace::inner::TimerInfo as ArkTimerInfo;
 #[cfg(not(target_arch = "wasm32"))]
 use ark_std::start_timer;
+use wasm_bindgen::prelude::*;
 #[cfg(target_arch = "wasm32")]
 use web_sys;
 
 pub struct WebTimerInfo {
+    start_time: f64,
     label: &'static str,
+}
+
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_namespace = Date)]
+    fn now() -> f64;
 }
 
 pub enum TimerInfo {
@@ -20,8 +28,10 @@ pub enum TimerInfo {
 pub fn timer_start(label: &'static str) -> TimerInfo {
     #[cfg(target_arch = "wasm32")]
     {
-        web_sys::console::time_with_label(label);
-        TimerInfo::Web(WebTimerInfo { label })
+        TimerInfo::Web(WebTimerInfo {
+            start_time: now(),
+            label,
+        })
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -34,7 +44,9 @@ pub fn timer_start(label: &'static str) -> TimerInfo {
 pub fn timer_end(timer: TimerInfo) {
     match timer {
         TimerInfo::Web(t) => {
-            web_sys::console::time_end_with_label(t.label);
+            let end = now();
+            let duration = end - t.start_time as f64;
+            web_sys::console::log_1(&JsValue::from(format!("{}: {}ms", t.label, duration)));
         }
         TimerInfo::Cmd(t) => {
             end_timer!(t);
