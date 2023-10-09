@@ -42,9 +42,9 @@ contract IPA is Secq256k1, Transcript {
             uint256 s_i = 1;
             for (uint256 j = 0; j < m; j++) {
                 if ((i >> j) & 1 == 1) {
-                    s_i = s_i.mul(r[j]);
-                } else {
                     s_i = s_i.mul(rInv[j]);
+                } else {
+                    s_i = s_i.mul(r[j]);
                 }
             }
 
