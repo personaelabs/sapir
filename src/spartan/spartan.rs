@@ -93,9 +93,7 @@ impl<C: CurveGroup> Spartan<C> {
         profiler_end(comm_witness_timer);
 
         // Add the witness commitment to the transcript
-        for T_k in &committed_witness.T {
-            transcript.append_point(*T_k);
-        }
+        transcript.append_points(&committed_witness.T);
 
         // ############################
         // Phase 1
@@ -116,6 +114,8 @@ impl<C: CurveGroup> Spartan<C> {
         // is a zero-polynomial using the sum-check protocol.
         // We evaluate Q(t) at $\tau$ and check that it is zero.
 
+        let tau = transcript.challenge_scalars(m, b"tau");
+
         // We implement the zero-knowledge sumcheck protocol
         // described in Section 4.1 https://eprint.iacr.org/2019/317.pdf
         let init_blinder_poly_timer = profiler_start("Init blinder poly");
@@ -126,8 +126,9 @@ impl<C: CurveGroup> Spartan<C> {
         let sc_phase_1_timer = profiler_start("Sumcheck phase 1");
 
         let sc_phase_1 = SumCheckPhase1::new(Az_poly.clone(), Bz_poly.clone(), Cz_poly.clone());
-        let (sc_proof_1, (v_A, v_B, v_C)) = sc_phase_1.prove(
+        let (sc_proof_1, (v_A, v_B, v_C), rx) = sc_phase_1.prove(
             &self.hyrax,
+            tau,
             sc1_blinder_poly.sum,
             sc1_blinder_poly,
             &sc1_blinder_poly_comm,
@@ -136,18 +137,15 @@ impl<C: CurveGroup> Spartan<C> {
 
         profiler_end(sc_phase_1_timer);
 
-        transcript.append_fe(v_A);
-        transcript.append_fe(v_B);
-        transcript.append_fe(v_C);
+        transcript.append_scalar(v_A);
+        transcript.append_scalar(v_B);
+        transcript.append_scalar(v_C);
 
         // Phase 2
-        let r = transcript.challenge_vec(3, "r".to_string());
+        let r = transcript.challenge_scalars(3, b"r");
 
         // T_2 should equal teh evaluations of the random linear combined polynomials
 
-        let rx = (0..m)
-            .map(|i| transcript.get(&format!("sc_phase_1-challenge-{}", i)))
-            .collect::<Vec<ScalarField<C>>>();
         let sc_phase_2_timer = profiler_start("Sumcheck phase 2");
         let sc_phase_2 = SumCheckPhase2::new(
             r1cs.A.clone(),
@@ -161,17 +159,13 @@ impl<C: CurveGroup> Spartan<C> {
         let (sc2_blinder_poly, sc2_blinder_poly_comm) =
             init_blinder_poly(m, 2, &self.hyrax, transcript);
 
-        let sc_proof_2 = sc_phase_2.prove(
+        let (sc_proof_2, ry) = sc_phase_2.prove(
             &self.hyrax,
             sc2_blinder_poly.sum,
             sc2_blinder_poly,
             &sc2_blinder_poly_comm,
             transcript,
         );
-
-        let ry = (0..m)
-            .map(|i| transcript.get(&format!("sc_phase_2-challenge-{}", i)))
-            .collect::<Vec<ScalarField<C>>>();
 
         profiler_end(sc_phase_2_timer);
 
@@ -218,7 +212,7 @@ impl<C: CurveGroup> Spartan<C> {
         // Verify phase 1 sumcheck
         // ############################
 
-        let tau = transcript.challenge_vec(m, "tau".to_string());
+        let tau = transcript.challenge_scalars(m, b"tau");
 
         let sc_phase1_sum_target = ScalarField::<C>::ZERO;
 
@@ -232,13 +226,14 @@ impl<C: CurveGroup> Spartan<C> {
         let sc_phase1_poly =
             |challenge: &[ScalarField<C>]| (v_A * v_B - v_C) * T_1_eq.eval(challenge);
 
-        let sc1_inters = verify_sum(
+        let (sc1_inters, rx) = verify_sum(
             &proof.sc_proof_1,
             &self.hyrax,
             sc_phase1_sum_target,
             sc_phase1_poly,
             3,
             transcript,
+            b"sc_phase_1",
             compute_inters,
         );
 
@@ -246,20 +241,16 @@ impl<C: CurveGroup> Spartan<C> {
         // Verify phase 2 sumcheck
         // ############################
 
-        transcript.append_fe(v_A);
-        transcript.append_fe(v_B);
-        transcript.append_fe(v_C);
+        transcript.append_scalar(v_A);
+        transcript.append_scalar(v_B);
+        transcript.append_scalar(v_C);
 
-        let r = transcript.challenge_vec(3, "r".to_string());
+        let r = transcript.challenge_scalars(3, b"r");
         let r_A = r[0];
         let r_B = r[1];
         let r_C = r[2];
 
         let sc_phase2_sum_target = r_A * v_A + r_B * v_B + r_C * v_C;
-
-        let rx = (0..m)
-            .map(|i| transcript.get(&format!("sc_phase_1-challenge-{}", i)))
-            .collect::<Vec<ScalarField<C>>>();
 
         let sc_phase2_poly = |ry: &[ScalarField<C>]| {
             let rx_ry = [&rx, ry].concat();
@@ -288,13 +279,14 @@ impl<C: CurveGroup> Spartan<C> {
             eval
         };
 
-        let sc2_inters = verify_sum(
+        let (sc2_inters, _) = verify_sum(
             &proof.sc_proof_2,
             &self.hyrax,
             sc_phase2_sum_target,
             sc_phase2_poly,
             2,
             transcript,
+            b"sc_phase_2",
             compute_inters,
         );
 
@@ -314,10 +306,6 @@ impl<C: CurveGroup> Spartan<C> {
             None
         }
     }
-
-    pub fn verify_precompute() {
-        todo!()
-    }
 }
 
 #[cfg(test)]
@@ -335,8 +323,8 @@ mod tests {
     type F = ark_secq256k1::Fr;
 
     #[test]
-    fn test_spartan_2() {
-        let num_cons = 2usize.pow(3);
+    fn test_spartan() {
+        let num_cons = 2usize.pow(10);
 
         let synthesizer = mock_circuit(num_cons);
         let mut cs = ConstraintSystem::new();

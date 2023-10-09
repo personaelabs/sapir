@@ -109,18 +109,10 @@ pub fn init_blinder_poly<C: CurveGroup>(
     let blinder_poly_comm = bp.bp.commit(random_coeffs_flat, blinder);
     profiler_end(commit_b_timer);
 
-    transcript.append_fe(blinder_poly.sum);
+    transcript.append_scalar(blinder_poly.sum);
     transcript.append_point(blinder_poly_comm.comm);
 
     (blinder_poly, blinder_poly_comm)
-}
-
-fn challenge_label(label: String) -> String {
-    format!("{}-challenge", label)
-}
-
-fn rho_label(label: String) -> String {
-    format!("{}-rho", label)
 }
 
 // This function implements the zero-knowledge sumcheck protocol, and
@@ -143,14 +135,14 @@ pub fn prove_sum<C: CurveGroup>(
     blinder_poly: BlinderPoly<ScalarField<C>>,
     blinder_poly_comm: &IPAComm<C>,
     transcript: &mut Transcript<C>,
-    label: String,
-) -> SumCheckProof<C> {
+    label: &'static [u8],
+) -> (SumCheckProof<C>, Vec<ScalarField<C>>) {
     let num_tables = eval_tables.len();
     let mut round_polys = Vec::<UniPoly<ScalarField<C>>>::with_capacity(poly_num_vars);
 
-    let rho = transcript.challenge_fe(rho_label(label.clone()));
+    let rho = transcript.challenge_scalar(label);
 
-    let challenge = transcript.challenge_vec(poly_num_vars, challenge_label(label.clone()));
+    let challenge = transcript.challenge_scalars(poly_num_vars, label);
 
     let round_poly_domain = (0..(poly_degree + 1)).map(|i| i).collect::<Vec<usize>>();
 
@@ -241,15 +233,17 @@ pub fn prove_sum<C: CurveGroup>(
 
     profiler_end(open_blinder_poly_profiler);
 
-    SumCheckProof {
-        label: label.to_string(),
-        blinder_poly_sum,
-        round_poly_coeffs: round_polys
-            .iter()
-            .map(|p| p.coeffs.clone())
-            .collect::<Vec<Vec<ScalarField<C>>>>(),
-        blinder_poly_eval_proof,
-    }
+    (
+        SumCheckProof {
+            blinder_poly_sum,
+            round_poly_coeffs: round_polys
+                .iter()
+                .map(|p| p.coeffs.clone())
+                .collect::<Vec<Vec<ScalarField<C>>>>(),
+            blinder_poly_eval_proof,
+        },
+        challenge,
+    )
 }
 
 // Evaluates all the round polynomials at the challenge point,
@@ -261,18 +255,19 @@ pub fn verify_sum<C: CurveGroup>(
     poly: impl Fn(&[ScalarField<C>]) -> ScalarField<C>,
     poly_degree: usize,
     transcript: &mut Transcript<C>,
+    label: &'static [u8],
     compute_inters: bool,
-) -> Option<IPAInters<C>> {
+) -> (Option<IPAInters<C>>, Vec<ScalarField<C>>) {
     // Append the sum and the commitment to the blinder polynomial to the transcript.
-    transcript.append_fe(proof.blinder_poly_sum);
+    transcript.append_scalar(proof.blinder_poly_sum);
     transcript.append_point(proof.blinder_poly_eval_proof.comm);
 
     // Get the challenge to combine the blinder polynomial with the summed polynomial(s).
-    let rho = transcript.challenge_fe(rho_label(proof.label.clone()));
+    let rho = transcript.challenge_scalar(label);
 
     // Get challenges for each round of the sumcheck protocol.
     let poly_num_vars = proof.round_poly_coeffs.len();
-    let challenge = transcript.challenge_vec(poly_num_vars, challenge_label(proof.label.clone()));
+    let challenge = transcript.challenge_scalars(poly_num_vars, label);
 
     // Verify the validity of the round polynomials.
     let mut target = sum_target + rho * proof.blinder_poly_sum;
@@ -299,11 +294,14 @@ pub fn verify_sum<C: CurveGroup>(
     let mut b = BlinderPoly::eval_point_powers(poly_degree, &challenge);
     b.resize(b.len().next_power_of_two(), ScalarField::<C>::ZERO);
 
-    bp.bp.verify(
-        &proof.blinder_poly_eval_proof,
-        b,
-        transcript,
-        compute_inters,
+    (
+        bp.bp.verify(
+            &proof.blinder_poly_eval_proof,
+            b,
+            transcript,
+            compute_inters,
+        ),
+        challenge,
     )
 }
 
@@ -367,7 +365,8 @@ mod tests {
         let (blinder_poly, blinder_poly_comm) =
             init_blinder_poly(poly_num_vars, poly_degree, &bp, &mut prover_transcript);
 
-        let sumcheck_proof = prove_sum(
+        let label = b"test_sumcheck";
+        let (sumcheck_proof, _) = prove_sum(
             poly_num_vars,
             poly_degree,
             &mut eval_tables,
@@ -377,7 +376,7 @@ mod tests {
             blinder_poly,
             &blinder_poly_comm,
             &mut prover_transcript,
-            "test_sumcheck".to_string(),
+            label,
         );
         profiler_end(sumcheck_prove_timer);
 
@@ -388,6 +387,7 @@ mod tests {
             poly,
             poly_degree,
             &mut verifier_transcript,
+            label,
             false,
         );
     }

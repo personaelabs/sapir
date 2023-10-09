@@ -1,5 +1,6 @@
 mod secp256k1_test;
 mod spartan_verifier_test;
+// mod transcript_test;
 mod utils;
 use crate::{
     r1cs::R1CS,

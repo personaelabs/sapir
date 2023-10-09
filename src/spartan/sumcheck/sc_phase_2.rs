@@ -44,7 +44,7 @@ impl<C: CurveGroup> SumCheckPhase2<C> {
         blinder_poly: BlinderPoly<ScalarField<C>>,
         blinder_poly_comm: &IPAComm<C>,
         transcript: &mut Transcript<C>,
-    ) -> SumCheckProof<C> {
+    ) -> (SumCheckProof<C>, Vec<ScalarField<C>>) {
         let r_A = self.r[0];
         let r_B = self.r[1];
         let r_C = self.r[2];
@@ -87,7 +87,7 @@ impl<C: CurveGroup> SumCheckPhase2<C> {
             blinder_poly,
             blinder_poly_comm,
             transcript,
-            "sc_phase_2".to_string(),
+            b"sc_phase_2",
         )
     }
 }

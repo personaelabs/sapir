@@ -118,9 +118,9 @@ impl<C: CurveGroup> Bulletproof<C> {
         let mut ck = self.gens.clone();
 
         // Send the claimed evaluation
-        transcript.append_fe(y);
+        transcript.append_scalar(y);
         // Get a challenge the rescale the basis
-        let x = transcript.challenge_fe("x".to_string());
+        let x = transcript.challenge_scalar(b"x");
 
         // Rescale `u`
         ck.u = Some(ck.u.unwrap() * x);
@@ -168,7 +168,7 @@ impl<C: CurveGroup> Bulletproof<C> {
             transcript.append_point(R);
 
             // Get the challenge `r`
-            let u = transcript.challenge_fe("r".to_string());
+            let u = transcript.challenge_scalar(b"r");
             let u_inv = u.inverse().unwrap();
             u_vec.push(u);
             u_inv_vec.push(u_inv);
@@ -228,7 +228,7 @@ impl<C: CurveGroup> Bulletproof<C> {
         let R = (G_final + (ck.u.unwrap() * b_final).into_affine()) * d + (ck.H.unwrap() * s);
 
         transcript.append_point(R);
-        let c = transcript.challenge_fe("c".to_string());
+        let c = transcript.challenge_scalar(b"c");
 
         let z1 = d + (c * a_final);
         let z2 = s + (c * r_prime);
@@ -258,11 +258,9 @@ impl<C: CurveGroup> Bulletproof<C> {
             let mut s_i = ScalarField::<C>::ONE;
             for j in 0..m {
                 if i >> j & 1 == 1 {
-                    // s_i *= r[m - j - 1];
-                    s_i *= r[j];
+                    s_i *= r[m - j - 1];
                 } else {
-                    // s_i *= r_inv[m - j - 1];
-                    s_i *= r_inv[j];
+                    s_i *= r_inv[m - j - 1];
                 }
             }
 
@@ -282,10 +280,10 @@ impl<C: CurveGroup> Bulletproof<C> {
         let n = b.len();
 
         // Append the claimed evaluation to the transcript
-        transcript.append_fe(proof.y);
+        transcript.append_scalar(proof.y);
 
         // Rescale `u`
-        let x = transcript.challenge_fe("x".to_string());
+        let x = transcript.challenge_scalar(b"x");
         let u = self.gens.u.unwrap() * x;
 
         // Get all the challenges from the transcript
@@ -293,11 +291,10 @@ impl<C: CurveGroup> Bulletproof<C> {
             .L_vec
             .iter()
             .zip(proof.R_vec.iter())
-            .enumerate()
-            .map(|(i, (L, R))| {
+            .map(|(L, R)| {
                 transcript.append_point(*L);
                 transcript.append_point(*R);
-                transcript.challenge_fe(format!("r_{}", i))
+                transcript.challenge_scalar(b"r")
             })
             .collect::<Vec<ScalarField<C>>>();
 
@@ -326,7 +323,7 @@ impl<C: CurveGroup> Bulletproof<C> {
             None
         };
 
-        let G_final = msm::<C>(&s, &self.gens.G[..s.len()]);
+        let G_final = msm_affine::<C>(&s, &self.gens.G_affine[..s.len()]).into_affine();
 
         // Compute Q
         let mut Q = proof.comm + u * proof.y;
@@ -341,7 +338,7 @@ impl<C: CurveGroup> Bulletproof<C> {
 
         // Verify the zero-knowledge opening
         transcript.append_point(proof.R);
-        let c = transcript.challenge_fe("c".to_string());
+        let c = transcript.challenge_scalar(b"c");
 
         let lhs = (Q * c).into_affine() + proof.R;
         let rhs = (G_final + (u * b).into_affine()) * proof.z1 + self.gens.H.unwrap() * proof.z2;

@@ -12,7 +12,7 @@ pub struct Gens<C: CurveGroup> {
 
 impl<C: CurveGroup> Gens<C> {
     pub fn new(n: usize) -> Self {
-        let seed = [0u8; 32];
+        let seed = [33u8; 32];
         let mut rng: StdRng = SeedableRng::from_seed(seed);
         let mut G: Vec<C> = Vec::new();
         let mut G_affine: Vec<C::Affine> = Vec::new();
@@ -26,7 +26,6 @@ impl<C: CurveGroup> Gens<C> {
 
         let u = C::Affine::rand(&mut rng).into();
 
-        // TODO: This is not secure
         Self {
             G,
             G_affine,

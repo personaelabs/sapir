@@ -1,68 +1,55 @@
-use ark_ec::{CurveConfig, CurveGroup};
-use std::collections::BTreeMap;
 use std::marker::PhantomData;
+
+use ark_ec::CurveGroup;
+use ark_ff::{BigInteger, Field, PrimeField};
 
 use crate::ScalarField;
 
 #[derive(Clone)]
 pub struct Transcript<C: CurveGroup> {
+    inner: merlin::Transcript,
     _marker: PhantomData<C>,
-    challenges: BTreeMap<String, ScalarField<C>>, // We store challenges for later reference
 }
 
 impl<C: CurveGroup> Transcript<C> {
     pub fn new(_label: &'static [u8]) -> Self {
-        // TODO: Append label to transcript
+        let inner = merlin::Transcript::new(_label);
+
         Self {
+            inner,
             _marker: PhantomData,
-            challenges: BTreeMap::new(),
         }
     }
 
-    pub fn append_fe(&mut self, _fe: ScalarField<C>) {
-        // TBD
+    pub fn append_scalar(&mut self, s: ScalarField<C>) {
+        self.inner
+            .append_message(b"scalar", &s.into_bigint().to_bytes_be());
     }
 
-    pub fn append_point(&mut self, _p: C) {
-        // TBD
+    pub fn append_point(&mut self, p: C) {
+        self.inner.append_message(b"p", &p.to_string().as_bytes());
     }
 
-    pub fn append_points(&mut self, _points: &[C]) {}
+    pub fn append_points(&mut self, points: &[C]) {
+        for p in points {
+            self.append_point(*p);
+        }
+    }
 
-    pub fn append_bytes(&mut self, _bytes: &[u8]) {}
+    pub fn challenge_scalar(&mut self, label: &'static [u8]) -> ScalarField<C> {
+        let mut bytes = [0u8; 32];
+        self.inner.challenge_bytes(label, &mut bytes);
 
-    pub fn challenge_vec(
-        &mut self,
-        n: usize,
-        label: String,
-    ) -> Vec<<C::Config as CurveConfig>::ScalarField> {
-        //! This is temporary
-        let c = (0..n)
-            .map(|_| ScalarField::<C>::from(33u32))
-            .collect::<Vec<ScalarField<C>>>();
+        ScalarField::<C>::from_random_bytes(&bytes).unwrap()
+    }
 
-        for i in 0..n {
-            let label_i = format!("{}-{}", label, i);
-            if self.challenges.contains_key(label_i.as_str()) {
-                panic!("Challenge label {} already exists", label_i);
-            }
-            self.challenges.insert(label_i, c[i]);
+    pub fn challenge_scalars(&mut self, n: usize, label: &'static [u8]) -> Vec<ScalarField<C>> {
+        let mut c = Vec::with_capacity(n);
+        for _ in 0..n {
+            let c_i = self.challenge_scalar(label);
+            c.push(c_i);
         }
 
         c
-    }
-
-    pub fn challenge_fe(&mut self, _label: String) -> ScalarField<C> {
-        // TBD
-
-        //! This is temporary
-        ScalarField::<C>::from(33u32)
-    }
-
-    pub fn get(&self, label: &str) -> ScalarField<C> {
-        *self
-            .challenges
-            .get(label)
-            .unwrap_or_else(|| panic!("Challenge label {} does not exist", label))
     }
 }
