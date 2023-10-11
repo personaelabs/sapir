@@ -564,7 +564,6 @@ impl<F: PrimeField> ConstraintSystem<F> {
                 let a_comb: F = a.iter().map(|(w, c)| self.wires[w.index] * c).sum();
                 let b_comb: F = b.iter().map(|(w, c)| self.wires[w.index] * c).sum();
                 let c_comb: F = c.iter().map(|(w, c)| self.wires[w.index] * c).sum();
-
                 self.wires[w3.index] = a_comb * b_comb + c_comb;
             } else {
                 let con = self.next_constraint_offset();
@@ -818,7 +817,8 @@ impl<F: PrimeField> ConstraintSystem<F> {
         }
 
         let one = self.one();
-        //  out = -w * inv + 1
+
+        // out = -w * inv + 1
         let out = self.constrain(&[(w, -F::ONE)], &[(inv, F::ONE)], &[(one, F::ONE)]);
 
         self.assert_zero(out * w);
@@ -938,6 +938,11 @@ impl<F: PrimeField> ConstraintSystem<F> {
         let gen_constraints_timer = profiler_start("Generating constraints");
         self.synthesize(synthesizer, Mode::ConstraintsGen);
         profiler_end(gen_constraints_timer);
+
+        // If no public inputs were allocated, we set the number of public inputs to 0.
+        if self.num_pub_inputs.is_none() {
+            self.num_pub_inputs = Some(0);
+        }
 
         self.constrained = true;
     }
@@ -1142,6 +1147,7 @@ mod tests {
 
     use super::*;
     use crate::frontend::test_utils::synthetic_circuit;
+    use ark_ff::Field;
 
     type F = ark_secq256k1::Fr;
 
@@ -1234,9 +1240,11 @@ mod tests {
     }
 
     // ########################################
-    // ########## Test for the operations ############
+    // ########## Test the primitive operations ############
     // ########################################
 
+    // 1. Test that the circuit is satisfiable when thew witness and the public input are valid
+    // 2. Test that the circuit unsatisfiable when the witness or the public input is invalid.
     fn test_circuit<F: PrimeField>(
         synthesizer: impl Fn(&mut ConstraintSystem<F>),
         pub_inputs: &[F],
@@ -1251,10 +1259,34 @@ mod tests {
 
         // Should assert when the witness is invalid
         for i in 0..cs.num_vars() {
-            witness[i] += F::from(1u32);
+            witness[i] += F::from(3u32);
             assert_eq!(cs.is_sat(&witness, &pub_inputs), false);
-            witness[i] -= F::from(1u32);
+            witness[i] -= F::from(3u32);
         }
+
+        // Should assert when the public inputs are invalid
+        let mut pub_inputs = pub_inputs.to_vec();
+        for i in 0..pub_inputs.len() {
+            pub_inputs[i] += F::from(3u32);
+            assert_eq!(cs.is_sat(&witness, &pub_inputs), false);
+        }
+    }
+
+    // 1. Test that the circuit is satisfiable when thew witness and the public input are valid
+    // 2. Test that the circuit unsatisfiable when the public input is invalid.
+    // We need this separate from `test_circuit` because some circuits are satisfiable even when the witness is
+    // randomly modified.
+    fn test_var_pub_input<F: PrimeField>(
+        synthesizer: impl Fn(&mut ConstraintSystem<F>),
+        pub_inputs: &[F],
+        priv_inputs: &[F],
+    ) {
+        let mut cs = ConstraintSystem::<F>::new();
+        cs.set_constraints(&synthesizer);
+
+        let witness = cs.gen_witness(&synthesizer, &pub_inputs, &priv_inputs);
+
+        assert!(cs.is_sat(&witness, &pub_inputs));
 
         // Should assert when the public inputs are invalid
         let mut pub_inputs = pub_inputs.to_vec();
@@ -1264,23 +1296,192 @@ mod tests {
         }
     }
 
+    // Test the primitive operations `add`, `sub`, and `div`.
+    // `mul` is for some reason a private function in `F` so we cannot test it here.
+    macro_rules! test_op {
+        ($op:ident) => {
+            // Test $op
+            let synthesizer = |cs: &mut ConstraintSystem<_>| {
+                let a = cs.alloc_priv_input();
+                let b = cs.alloc_priv_input();
+
+                // a $op b = c
+                let c = a.$op(b);
+
+                cs.expose_public(c);
+            };
+
+            let a = F::from(3u32);
+            let b = F::from(4u32);
+            let c = a.$op(b);
+            let priv_inputs = [a, b];
+            let pub_inputs = [c];
+            test_circuit(synthesizer, &pub_inputs, &priv_inputs);
+        };
+    }
+
+    // Test the primitive operations `add_assign`, `sub_assign`, and `div_assign`.
+    // `mul_assign` is for some reason a private function in `F` so we cannot test it here.
+    macro_rules! test_op_assign {
+        ($op_assign:ident) => {
+            // Test $op_assign
+            let synthesizer = |cs: &mut ConstraintSystem<_>| {
+                let a = cs.alloc_priv_input();
+                let b = cs.alloc_priv_input();
+
+                // a $op b = c
+                let a = a.$op_assign(b);
+
+                cs.expose_public(a);
+            };
+            let a = F::from(3u32);
+            let b = F::from(4u32);
+            let a_assigned = a.$op_assign(b);
+            let priv_inputs = [a, b];
+            let pub_inputs = [a_assigned];
+            test_circuit(synthesizer, &pub_inputs, &priv_inputs);
+        };
+    }
+
     #[test]
     fn test_add() {
+        test_op!(add);
+        test_op_assign!(add);
+    }
+
+    #[test]
+    fn test_sub() {
+        test_op!(sub);
+        test_op_assign!(sub);
+    }
+
+    // We cannot use the `test_op` macro for `mul` because
+    // `mul` is for some reason a private function in `F`.
+    #[test]
+    fn test_mul() {
         let synthesizer = |cs: &mut ConstraintSystem<_>| {
-            // a + b = c
             let a = cs.alloc_priv_input();
             let b = cs.alloc_priv_input();
 
-            let c = cs.add(a, b);
+            // a $op b = c
+            let c = a * b;
+
             cs.expose_public(c);
         };
 
         let a = F::from(3u32);
         let b = F::from(4u32);
-        let c = a + b;
+        let c = a * b;
         let priv_inputs = [a, b];
         let pub_inputs = [c];
         test_circuit(synthesizer, &pub_inputs, &priv_inputs);
+    }
+
+    #[test]
+    fn test_div() {
+        test_op!(div);
+        test_op_assign!(div);
+    }
+
+    #[test]
+    fn test_and() {
+        let synthesizer = |cs: &mut ConstraintSystem<_>| {
+            let a = cs.alloc_priv_input();
+            let b = cs.alloc_priv_input();
+
+            // a AND b = c
+            let c = cs.and(a, b);
+
+            cs.expose_public(c);
+        };
+
+        let cases = [(false, false), (false, true), (true, false), (true, true)];
+
+        for case in &cases {
+            let a = F::from(case.0);
+            let b = F::from(case.1);
+            let c = F::from(case.0 & case.1);
+            let priv_inputs = [a, b];
+            let pub_inputs = [c];
+            test_var_pub_input(synthesizer, &pub_inputs, &priv_inputs);
+        }
+    }
+
+    #[test]
+    fn test_or() {
+        let synthesizer = |cs: &mut ConstraintSystem<_>| {
+            let a = cs.alloc_priv_input();
+            let b = cs.alloc_priv_input();
+
+            // a AND b = c
+            let c = cs.or(a, b);
+
+            cs.expose_public(c);
+        };
+
+        let cases = [(false, false), (false, true), (true, false), (true, true)];
+
+        for case in &cases {
+            let a = F::from(case.0);
+            let b = F::from(case.1);
+            let c = F::from(case.0 || case.1);
+            let priv_inputs = [a, b];
+            let pub_inputs = [c];
+            test_var_pub_input(synthesizer, &pub_inputs, &priv_inputs);
+        }
+    }
+
+    #[test]
+    fn test_not() {
+        let synthesizer = |cs: &mut ConstraintSystem<_>| {
+            let a = cs.alloc_priv_input();
+
+            // a AND b = c
+            let c = cs.not(a);
+
+            cs.expose_public(c);
+        };
+
+        let cases = [true, false];
+
+        for case in &cases {
+            let a = F::from(*case);
+            let c = F::from(!case);
+            let priv_inputs = [a];
+            let pub_inputs = [c];
+            test_var_pub_input(synthesizer, &pub_inputs, &priv_inputs);
+        }
+    }
+
+    #[test]
+    fn test_div_or_zero() {
+        let synthesizer = |cs: &mut ConstraintSystem<_>| {
+            let a = cs.alloc_priv_input();
+            let b = cs.alloc_priv_input();
+
+            // a $op b = c
+            let c = a.div_or_zero(b);
+
+            cs.expose_public(c);
+        };
+
+        // Divide by nonzero
+
+        let a = F::from(3u32);
+        let b = F::from(4u32);
+        let c = a / b;
+        let priv_inputs = [a, b];
+        let pub_inputs = [c];
+        test_circuit(synthesizer, &pub_inputs, &priv_inputs);
+
+        // Divide by 0
+
+        let a = F::from(3u32);
+        let b = F::from(0u32);
+        let c = F::ZERO;
+        let priv_inputs = [a, b];
+        let pub_inputs = [c];
+        test_var_pub_input(synthesizer, &pub_inputs, &priv_inputs);
     }
 
     #[test]
@@ -1304,5 +1505,106 @@ mod tests {
         test_circuit(synthesizer, &pub_inputs, &priv_inputs);
     }
 
-    // TODO: Add tests for all the operations
+    #[test]
+    fn test_is_equal() {
+        let synthesizer = |cs: &mut ConstraintSystem<_>| {
+            // a == b = c
+            let a = cs.alloc_priv_input();
+            let b = cs.alloc_priv_input();
+
+            let c = cs.is_equal(a, b);
+            cs.expose_public(c);
+        };
+
+        let a = F::from(3u32);
+        let b = F::from(4u32);
+
+        let cases = [
+            (a, a),
+            (a, b),
+            (b, a),
+            (F::ZERO, a),
+            (F::ONE, a),
+            (F::ZERO, F::ZERO),
+        ];
+
+        for case in &cases {
+            let c = F::from(case.0 == case.1);
+            let priv_inputs = [case.0, case.1];
+            let pub_inputs = [c];
+            test_var_pub_input(synthesizer, &pub_inputs, &priv_inputs);
+        }
+    }
+
+    #[test]
+    fn test_is_zero() {
+        let synthesizer = |cs: &mut ConstraintSystem<_>| {
+            // a == 0 = c
+            let a = cs.alloc_priv_input();
+
+            let c = cs.is_zero(a);
+            cs.expose_public(c);
+        };
+
+        let a = F::from(3u32);
+        let cases = [a, F::ZERO];
+
+        for case in &cases {
+            let b = F::from(*case == F::ZERO);
+            let priv_inputs = [*case];
+            let pub_inputs = [b];
+            test_var_pub_input(synthesizer, &pub_inputs, &priv_inputs);
+        }
+    }
+
+    #[test]
+    fn test_assert_zero() {
+        let synthesizer = |cs: &mut ConstraintSystem<_>| {
+            // a == 0 = c
+            let a = cs.alloc_priv_input();
+
+            cs.assert_zero(a);
+        };
+
+        let priv_inputs = [F::ZERO];
+        let pub_inputs = [];
+        test_var_pub_input(synthesizer, &pub_inputs, &priv_inputs);
+
+        // TODO: Check that the circuit asserts when the input is not zero
+    }
+
+    #[test]
+    fn test_conditional() {
+        let synthesizer = |cs: &mut ConstraintSystem<_>| {
+            let a = cs.alloc_priv_input();
+            let b = cs.alloc_priv_input();
+            let c = cs.alloc_priv_input();
+
+            let sel1 = cs.alloc_priv_input();
+            let sel2 = cs.alloc_priv_input();
+
+            let out = cs.if_then(sel1, a).elif(sel2, b, cs).else_then(c);
+
+            cs.expose_public(out);
+        };
+
+        let a = F::from(3);
+        let b = F::from(4);
+        let c = F::from(5);
+
+        let cases = [(true, true), (true, false), (false, true), (false, false)];
+
+        for case in cases {
+            let priv_inputs = [a, b, c, F::from(case.0), F::from(case.1)];
+            let out = if case.0 {
+                a
+            } else if case.1 {
+                b
+            } else {
+                c
+            };
+            let pub_inputs = [out];
+            test_var_pub_input(synthesizer, &pub_inputs, &priv_inputs);
+        }
+    }
 }
