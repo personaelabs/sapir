@@ -1,4 +1,4 @@
-pub mod wasm_deps {
+pub mod prelude {
     // Re-export the dependencies that are used in the wasm module
     // pub use crate::evm_verifier::generate_submit_proof_input;
     pub use crate::frontend::constraint_system::{CircuitMeta, ConstraintSystem};
@@ -26,7 +26,7 @@ pub mod wasm_deps {
 }
 
 #[allow(unused_imports)]
-use wasm_deps::*;
+use prelude::*;
 
 #[macro_export]
 macro_rules! circuit {

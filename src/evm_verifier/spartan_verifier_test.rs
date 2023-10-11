@@ -3,7 +3,7 @@ mod tests {
     use super::super::utils::test_utils::*;
     use super::super::utils::*;
     use crate::spartan::spartan::Spartan;
-    use crate::wasm::wasm_deps::Transcript;
+    use crate::wasm::prelude::Transcript;
     use crate::{constraint_system::ConstraintSystem, mock_circuit};
     use ark_std::{end_timer, start_timer};
     use ethers::prelude::*;

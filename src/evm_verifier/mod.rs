@@ -4,7 +4,7 @@ mod spartan_verifier_test;
 mod utils;
 use crate::{
     r1cs::R1CS,
-    wasm::wasm_deps::{Spartan, SpartanProof, Transcript},
+    wasm::prelude::{Spartan, SpartanProof, Transcript},
     ScalarField,
 };
 use ark_ec::CurveGroup;
