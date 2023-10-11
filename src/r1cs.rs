@@ -1,7 +1,6 @@
+use crate::spartan::polynomial::sparse_ml_poly::SparseMLPoly;
 use ark_ff::PrimeField;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-
-use crate::spartan::polynomial::sparse_ml_poly::SparseMLPoly;
 
 #[derive(Clone, Debug, CanonicalSerialize, CanonicalDeserialize)]
 pub struct SparseMatrixEntry<F: PrimeField> {

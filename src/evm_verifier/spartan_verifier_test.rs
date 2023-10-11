@@ -92,7 +92,7 @@ mod tests {
             step: 0,
         };
 
-        let gens = spartan.hyrax.bp.gens.clone().to_evm_val();
+        let gens = spartan.hyrax.ipa.gens.clone().to_evm_val();
 
         // Verify the proof
         let mut tx =

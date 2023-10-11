@@ -28,6 +28,7 @@ impl<C: CurveGroup> SumCheckPhase1<C> {
 
     pub fn prove(
         &self,
+        poly_num_vars: usize,
         pcs: &Hyrax<C>,
         tau: Vec<ScalarField<C>>,
         blinder_poly_sum: ScalarField<C>,
@@ -39,7 +40,6 @@ impl<C: CurveGroup> SumCheckPhase1<C> {
         (ScalarField<C>, ScalarField<C>, ScalarField<C>),
         Vec<ScalarField<C>>,
     ) {
-        let poly_num_vars = (self.Az_evals.len() as f64).log2() as usize;
         let poly_degree = 3;
 
         let mut eval_tables = vec![

@@ -1,6 +1,5 @@
-use ark_ff::PrimeField;
-
 use crate::frontend::constraint_system::ConstraintSystem;
+use ark_ff::PrimeField;
 
 #[allow(unused_must_use)]
 pub fn mock_circuit<F: PrimeField>(num_cons: usize) -> impl Fn(&mut ConstraintSystem<F>) {
@@ -8,7 +7,7 @@ pub fn mock_circuit<F: PrimeField>(num_cons: usize) -> impl Fn(&mut ConstraintSy
         let a = cs.alloc_priv_input();
         let b = cs.alloc_priv_input();
 
-        // There is always one constraint all teh additions,
+        // There is always one constraint for all the additions,
         // so we do num_cons - 1 multiplications to
         // obtain a circuit with num_cons constraints.
         for _ in 0..(num_cons - 1) {

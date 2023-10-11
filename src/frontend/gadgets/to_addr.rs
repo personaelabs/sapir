@@ -1,5 +1,6 @@
+use super::bitops::le_bits_to_byte;
 use crate::frontend::constraint_system::Wire;
-use crate::frontend::gadgets::bitops::{from_bits, not_a_and_b_64, rotate_left_64, xor_64};
+use crate::frontend::gadgets::bitops::{not_a_and_b_64, rotate_left_64, xor_64};
 use ark_ff::PrimeField;
 use std::ops::Add;
 
@@ -165,10 +166,8 @@ pub fn to_addr<F: PrimeField>(input: [Wire<F>; 512]) -> Wire<F> {
 
     let mut out = cs.zero();
     let mut pow = F::ONE;
-    for (i, bytes) in address_bits.chunks(8).rev().enumerate() {
-        let mut bytes = bytes.to_vec();
-        bytes.reverse();
-        let byte = from_bits(&bytes);
+    for (i, bits) in address_bits.chunks(8).rev().enumerate() {
+        let byte = le_bits_to_byte(&bits);
         let term = cs.mul_const(byte, pow);
         out = out.add(term);
 

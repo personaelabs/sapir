@@ -1,9 +1,7 @@
-use std::marker::PhantomData;
-
+use crate::ScalarField;
 use ark_ec::CurveGroup;
 use ark_ff::{BigInteger, Field, PrimeField};
-
-use crate::ScalarField;
+use std::marker::PhantomData;
 
 #[derive(Clone)]
 pub struct Transcript<C: CurveGroup> {

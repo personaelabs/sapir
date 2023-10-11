@@ -35,12 +35,14 @@ pub struct IPAComm<C: CurveGroup> {
     pub blinder: ScalarField<C>,
 }
 
+// We implement the Polynomial commitment scheme described in
+// section 3 of the halo paper: https://eprint.iacr.org/2019/1021.pdf
 #[derive(Clone)]
-pub struct Bulletproof<C: CurveGroup> {
+pub struct IPA<C: CurveGroup> {
     pub gens: Gens<C>,
 }
 
-impl<C: CurveGroup> Bulletproof<C> {
+impl<C: CurveGroup> IPA<C> {
     pub fn new(n: usize) -> Self {
         let gens = Gens::<C>::new(n);
         Self { gens }
@@ -81,12 +83,13 @@ impl<C: CurveGroup> Bulletproof<C> {
         v.iter().map(|v| *v * s).collect()
     }
 
+    // Hadamard product of elliptic curve points
     fn hadamard(a: &[C], b: &[C]) -> Vec<C> {
         assert_eq!(a.len(), b.len());
         a.iter().zip(b.iter()).map(|(a, b)| *a + *b).collect()
     }
 
-    // Commit to the vector `a`
+    // Return the Pedersen commitment to a vector with the given blinder
     pub fn commit(&self, a: Vec<ScalarField<C>>, blinder: ScalarField<C>) -> IPAComm<C> {
         let comm =
             msm_affine::<C>(&a, &self.gens.G_affine[..a.len()]) + self.gens.H.unwrap() * blinder;
@@ -98,6 +101,8 @@ impl<C: CurveGroup> Bulletproof<C> {
         }
     }
 
+    // Open the inner product <a, b> = y in zero-knowledge
+    // Implements the "Modified inner product" from https://eprint.iacr.org/2019/1021.pdf
     pub fn open(
         &self,
         comm_a: &IPAComm<C>,
@@ -110,16 +115,16 @@ impl<C: CurveGroup> Bulletproof<C> {
         assert!(n.is_power_of_two());
 
         // Compute the inner product <a, b>.
-        // (i.e. the evaluation of the polynomial at `x`)
         let y = inner_prod(&a, &b);
 
         let mut a = a;
         let mut b = b;
         let mut ck = self.gens.clone();
 
-        // Send the claimed evaluation
+        // Add the the claimed evaluation to the transcript
         transcript.append_scalar(y);
-        // Get a challenge the rescale the basis
+
+        // Get a challenge to rescale the basis
         let x = transcript.challenge_scalar(b"x");
 
         // Rescale `u`
@@ -163,11 +168,10 @@ impl<C: CurveGroup> Bulletproof<C> {
             L_vec.push(L);
             R_vec.push(R);
 
-            // Append L and R into the transcript
+            // Append L and R to the transcript
             transcript.append_point(L);
             transcript.append_point(R);
 
-            // Get the challenge `r`
             let u = transcript.challenge_scalar(b"r");
             let u_inv = u.inverse().unwrap();
             u_vec.push(u);
@@ -198,6 +202,7 @@ impl<C: CurveGroup> Bulletproof<C> {
             n_prime = n / 2;
         }
 
+        // Compute `r_prime``
         let mut r_prime = ScalarField::<C>::ZERO;
 
         for (u_i, l_i) in u_vec.iter().zip(l_vec.iter()) {
@@ -210,7 +215,8 @@ impl<C: CurveGroup> Bulletproof<C> {
 
         r_prime += comm_a.blinder;
 
-        // Prove knowledge of a[0] and r_prime
+        // Prove knowledge of a[0] and r_prime in zero-knowledge
+        // "Zero-Knowledge Opening" from https://eprint.iacr.org/2019/1021.pdf
 
         let d = ScalarField::<C>::rand(&mut rng);
         let s = ScalarField::<C>::rand(&mut rng);
@@ -221,7 +227,6 @@ impl<C: CurveGroup> Bulletproof<C> {
         assert_eq!(L_vec.len(), num_rounds);
         assert_eq!(R_vec.len(), num_rounds);
 
-        // Zero-knowledge proof of knowledge of a[0] and r_prime
         let G_final = ck.G[0];
         let b_final = b[0];
         let a_final = a[0];
@@ -315,6 +320,7 @@ impl<C: CurveGroup> Bulletproof<C> {
 
         let b = b_folded[0];
 
+        // Compute the intermediate values used for optimistic verification
         let inters = if compute_inters {
             let s_G_inters = msm_powers(&s, &self.gens.G[..s.len()]);
 
@@ -337,6 +343,7 @@ impl<C: CurveGroup> Bulletproof<C> {
         }
 
         // Verify the zero-knowledge opening
+
         transcript.append_point(proof.R);
         let c = transcript.challenge_scalar(b"c");
 
@@ -351,20 +358,18 @@ impl<C: CurveGroup> Bulletproof<C> {
 
 #[cfg(test)]
 mod tests {
-
+    use super::*;
     use crate::{
         spartan::polynomial::eq_poly::EqPoly,
         spartan::polynomial::ml_poly::MlPoly,
         timer::{timer_end, timer_start},
     };
 
-    use super::*;
-
     type F = ark_secq256k1::Fr;
     type Curve = ark_secq256k1::Projective;
 
     #[test]
-    fn test_bulletproof() {
+    fn test_ipa() {
         let m = 5;
         let n = 2usize.pow(m as u32);
         let a = (0..n).map(|i| F::from(i as u64)).collect::<Vec<F>>();
@@ -374,20 +379,20 @@ mod tests {
 
         let b = EqPoly::new(x).evals();
 
-        let bp = Bulletproof::<Curve>::new(n);
+        let ipa = IPA::<Curve>::new(n);
         let blinder = F::from(3);
         let comm_timer = timer_start("Commit");
-        let comm = bp.commit(a, blinder);
+        let comm = ipa.commit(a, blinder);
         timer_end(comm_timer);
 
         let mut prover_transcript = Transcript::new(b"test");
         let open_timer = timer_start("Open");
-        let eval_proof = bp.open(&comm, b.clone(), &mut prover_transcript);
+        let eval_proof = ipa.open(&comm, b.clone(), &mut prover_transcript);
         timer_end(open_timer);
 
         assert_eq!(eval_proof.y, y);
 
         let mut verifier_transcript = Transcript::new(b"test");
-        bp.verify(&eval_proof, b, &mut verifier_transcript, false);
+        ipa.verify(&eval_proof, b, &mut verifier_transcript, false);
     }
 }

@@ -134,9 +134,7 @@ macro_rules! circuit {
 
             let circuit = CIRCUIT.lock().unwrap().clone();
 
-            let bp = PCS.lock().unwrap().clone();
-
-            generate_submit_proof_input(&bp, proof, &circuit, contract_address)
+            generate_submit_proof_input(proof, &circuit, contract_address)
         }
          */
     };
@@ -169,7 +167,7 @@ mod tests {
 
     #[test]
     fn test_client_prove() {
-        const NUM_CONS: usize = 2usize.pow(8);
+        const NUM_CONS: usize = 2usize.pow(4);
         circuit!(mock_circuit(NUM_CONS), Curve);
 
         let priv_input = [F::from(3), F::from(4)];

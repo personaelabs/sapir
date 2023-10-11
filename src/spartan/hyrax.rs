@@ -1,11 +1,8 @@
-use ark_ec::CurveGroup;
-use ark_ff::Field;
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-
+use super::ipa::IPAInters;
 use crate::{
     spartan::transcript::Transcript,
     spartan::{
-        ipa::Bulletproof,
+        ipa::IPA,
         polynomial::eq_poly::EqPoly,
         utils::{inner_prod, msm_powers},
     },
@@ -15,8 +12,9 @@ use crate::{
     },
     ScalarField,
 };
-
-use super::ipa::IPAInters;
+use ark_ec::CurveGroup;
+use ark_ff::{Field, UniformRand};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 
 pub struct HyraxComm<C: CurveGroup> {
     pub T: Vec<C>,
@@ -26,7 +24,7 @@ pub struct HyraxComm<C: CurveGroup> {
 
 #[derive(Clone)]
 pub struct Hyrax<C: CurveGroup> {
-    pub bp: Bulletproof<C>,
+    pub ipa: IPA<C>,
     padded_num_rows: usize,
     padded_num_cols: usize,
     padded_num_vrs: usize,
@@ -40,7 +38,7 @@ pub struct PolyEvalProof<C: CurveGroup> {
     pub inner_prod_proof: InnerProductProof<C>,
 }
 
-// MSM intermediates that appear in the proof
+// MSM intermediate powers used in optimistic verification
 #[derive(Clone)]
 pub struct PolyEvalProofInters<C: CurveGroup> {
     pub T_prime_inters: Vec<C>,
@@ -50,7 +48,7 @@ pub struct PolyEvalProofInters<C: CurveGroup> {
 impl<C: CurveGroup> Hyrax<C> {
     // TODO: Make it cleaner by not taking `num_bases` as input here
     pub fn new(n: usize, num_bases: usize) -> Self {
-        let bp = Bulletproof::new(num_bases);
+        let ipa = IPA::new(num_bases);
 
         let padded_num_cols = Self::det_num_cols(n);
         let padded_num_rows = Self::det_num_rows(n);
@@ -58,13 +56,14 @@ impl<C: CurveGroup> Hyrax<C> {
         let n_padded_log2 = (padded_n as f64).log2() as usize;
 
         Self {
-            bp,
+            ipa,
             padded_num_cols: padded_num_cols,
             padded_num_rows: padded_num_rows,
             padded_num_vrs: n_padded_log2,
         }
     }
 
+    // Determine the number of rows in the matrix
     pub fn det_num_rows(n: usize) -> usize {
         assert!(n.is_power_of_two());
 
@@ -80,42 +79,44 @@ impl<C: CurveGroup> Hyrax<C> {
         padded_num_rows
     }
 
+    // Determine the number of columns in the matrix
     pub fn det_num_cols(n: usize) -> usize {
         Self::det_num_rows(n)
     }
 
+    // `const` function to create an empty Hyrax instance
     pub const fn empty() -> Self {
         Self {
-            bp: Bulletproof::empty(),
+            ipa: IPA::empty(),
             padded_num_cols: 0,
             padded_num_rows: 0,
             padded_num_vrs: 0,
         }
     }
 
-    // Commit to a multilinear in polynomial `a` in evaluation form
-    pub fn commit(&self, w: Vec<ScalarField<C>>, _blinder: ScalarField<C>) -> HyraxComm<C> {
+    // Commit to a multilinear in polynomial `w` in evaluation form
+    pub fn commit(&self, w: Vec<ScalarField<C>>) -> HyraxComm<C> {
         let mut w = w;
         w.resize(
             self.padded_num_rows * self.padded_num_cols,
             ScalarField::<C>::ZERO,
         );
 
-        // In column-major order
+        // Transform the vector to a matrix in column-major order
         let mut w_rows = Vec::with_capacity(self.padded_num_cols);
         for col in 0..self.padded_num_cols {
             w_rows.push(w[col * self.padded_num_rows..(col + 1) * self.padded_num_rows].to_vec());
         }
 
-        // let mut rng = ark_std::rand::thread_rng();
+        let mut rng = ark_std::rand::thread_rng();
         let blinders = (0..w_rows.len())
-            .map(|_| ScalarField::<C>::ZERO)
+            .map(|_| ScalarField::<C>::rand(&mut rng))
             .collect::<Vec<ScalarField<C>>>();
 
         let T = w_rows
             .iter()
             .zip(blinders.iter())
-            .map(|(row, blinder)| self.bp.commit(row.to_vec(), *blinder).comm)
+            .map(|(row, blinder)| self.ipa.commit(row.to_vec(), *blinder).comm)
             .collect::<Vec<C>>();
 
         HyraxComm {
@@ -132,8 +133,6 @@ impl<C: CurveGroup> Hyrax<C> {
         x: Vec<ScalarField<C>>,
         transcript: &mut Transcript<C>,
     ) -> PolyEvalProof<C> {
-        // Compute `L` and `R`
-
         // Pad `x`
         let mut x = x;
         let mut pad = vec![ScalarField::<C>::ZERO; self.padded_num_vrs - x.len()];
@@ -146,6 +145,8 @@ impl<C: CurveGroup> Hyrax<C> {
         let num_rows_log2 = (self.padded_num_rows as f64).log2() as usize;
         let x_low = x[..num_cols_log2].to_vec();
         let x_high = x[num_rows_log2..].to_vec();
+
+        // Compute `L` and `R`
         let L = EqPoly::new(x_low).evals();
         let R = EqPoly::new(x_high.clone()).evals();
 
@@ -171,7 +172,7 @@ impl<C: CurveGroup> Hyrax<C> {
             blinder: inner_prod(&comm_a.blinders, &L),
         };
 
-        let inner_prod_proof = self.bp.open(&a_aug_comm, R, transcript);
+        let inner_prod_proof = self.ipa.open(&a_aug_comm, R, transcript);
 
         PolyEvalProof {
             x,
@@ -215,7 +216,7 @@ impl<C: CurveGroup> Hyrax<C> {
         assert_eq!(x, proof.x);
 
         let bp_result = self
-            .bp
+            .ipa
             .verify(&proof.inner_prod_proof, R, transcript, compute_inters);
 
         if compute_inters {
@@ -244,7 +245,7 @@ mod tests {
 
     #[test]
     fn test_hyrax() {
-        let m = 13;
+        let m = 5;
         let n = 2usize.pow(m as u32);
         let a = (0..n).map(|i| F::from((i + 33) as u64)).collect::<Vec<F>>();
         let poly = MlPoly::new(a.clone());
@@ -252,9 +253,8 @@ mod tests {
         let y = poly.eval(&x);
 
         let hyrax = Hyrax::<Curve>::new(n, n);
-        let blinder = F::from(3);
         let comm_timer = timer_start("Commit");
-        let comm = hyrax.commit(a, blinder);
+        let comm = hyrax.commit(a);
         timer_end(comm_timer);
 
         let mut prover_transcript = Transcript::new(b"test");

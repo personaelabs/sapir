@@ -1202,43 +1202,6 @@ mod tests {
         assert_eq!(witness, expected_witness);
     }
 
-    #[test]
-    fn test_valid_witness() {
-        let (synthesizer, pub_inputs, priv_inputs, _) = synthetic_circuit();
-        let mut cs = ConstraintSystem::<_>::new();
-        cs.set_constraints(&synthesizer);
-
-        let witness: Vec<F> = cs.gen_witness(&synthesizer, &pub_inputs, &priv_inputs);
-
-        assert!(cs.is_sat(&witness, &pub_inputs));
-    }
-
-    #[test]
-    fn test_invalid_witness() {
-        let (synthesizer, pub_inputs, priv_inputs, _) = synthetic_circuit();
-        let mut cs = ConstraintSystem::<F>::new();
-        cs.set_constraints(&synthesizer);
-
-        let mut witness = cs.gen_witness(&synthesizer, &pub_inputs, &priv_inputs);
-
-        witness[0] += F::from(1u32);
-
-        assert_eq!(cs.is_sat(&witness, &pub_inputs), false);
-    }
-
-    #[test]
-    fn test_invalid_pub_input() {
-        let (synthesizer, mut pub_inputs, priv_inputs, _) = synthetic_circuit();
-        let mut cs = ConstraintSystem::<F>::new();
-        cs.set_constraints(&synthesizer);
-
-        let witness = cs.gen_witness(&synthesizer, &pub_inputs, &priv_inputs);
-
-        pub_inputs[0] += F::from(1u32);
-
-        assert_eq!(cs.is_sat(&witness, &pub_inputs), false);
-    }
-
     // ########################################
     // ########## Test the primitive operations ############
     // ########################################

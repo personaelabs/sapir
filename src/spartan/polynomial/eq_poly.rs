@@ -7,11 +7,11 @@ pub struct EqPoly<F: PrimeField> {
 }
 
 impl<F: PrimeField> EqPoly<F> {
-    // `t` should be in big-endian.
     pub fn new(t: Vec<F>) -> Self {
         Self { t }
     }
 
+    // `x` should be in big-endian when treated as bits
     pub fn eval(&self, x: &[F]) -> F {
         let mut result = F::ONE;
         let one = F::ONE;
@@ -22,6 +22,7 @@ impl<F: PrimeField> EqPoly<F> {
         result
     }
 
+    // Evaluate the polynomial at `x` as bits
     pub fn eval_as_bits(&self, x: usize) -> F {
         let mut result = F::ONE;
         let one = F::ONE;
@@ -40,6 +41,7 @@ impl<F: PrimeField> EqPoly<F> {
     }
 
     // Copied from microsoft/Spartan
+    // Return the evaluations over the boolean hypercube
     pub fn evals(&self) -> Vec<F> {
         let ell = self.t.len();
 

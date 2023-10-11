@@ -30,9 +30,6 @@ impl<F: PrimeField> MlPoly<F> {
         result
     }
 
-    // Evaluate the multilinear extension of the polynomial `a`, at point `t`.
-    // `a` is in evaluation form.
-    // `t` should be in big-endian form.
     pub fn eval(&self, t: &[F]) -> F {
         let n = self.evals.len();
         debug_assert_eq!((n as f64).log2() as usize, t.len());

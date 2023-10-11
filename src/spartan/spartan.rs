@@ -1,28 +1,23 @@
-use ark_ec::CurveGroup;
-use ark_ff::{Field, UniformRand};
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use rand::thread_rng;
-use std::marker::PhantomData;
-
-use crate::{
-    r1cs::R1CS,
-    timer::{profiler_end, profiler_start},
-    ScalarField,
-};
-
-use crate::spartan::{
-    hyrax::Hyrax,
-    polynomial::eq_poly::EqPoly,
-    sumcheck::{sumcheck::verify_sum, SumCheckPhase1, SumCheckPhase2},
-    transcript::Transcript,
-};
-
 use super::{
     hyrax::{PolyEvalProof, PolyEvalProofInters},
     ipa::IPAInters,
     polynomial::sparse_ml_poly::SparseMLPoly,
     sumcheck::{sumcheck::init_blinder_poly, SumCheckProof},
 };
+use crate::spartan::{
+    hyrax::Hyrax,
+    polynomial::eq_poly::EqPoly,
+    sumcheck::{sumcheck::verify_sum, SumCheckPhase1, SumCheckPhase2},
+    transcript::Transcript,
+};
+use crate::{
+    r1cs::R1CS,
+    timer::{profiler_end, profiler_start},
+    ScalarField,
+};
+use ark_ec::CurveGroup;
+use ark_ff::Field;
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 
 #[derive(CanonicalDeserialize, CanonicalSerialize)]
 pub struct SpartanProof<C: CurveGroup> {
@@ -35,6 +30,7 @@ pub struct SpartanProof<C: CurveGroup> {
     pub v_C: ScalarField<C>,
 }
 
+// Intermediate values used for optimistic verification
 pub struct SpartanVerifyInters<C: CurveGroup> {
     pub sc1_inters: IPAInters<C>,
     pub sc2_inters: IPAInters<C>,
@@ -43,17 +39,11 @@ pub struct SpartanVerifyInters<C: CurveGroup> {
 
 pub struct Spartan<C: CurveGroup> {
     pub hyrax: Hyrax<C>,
-    _marker: PhantomData<C>,
 }
 
 impl<C: CurveGroup> Spartan<C> {
     // n: the length of the z vector
     pub fn new(n: usize) -> Self {
-        // Generators are use in Hyrax for committing the witness polynomial,
-        // and two IPAs for committing the blinder polynomials.
-        // We prepare generators with size sufficient to conduct the
-        // above commitments.
-
         let m = (n as f64).log2() as usize;
 
         // The blinder polynomial in the first sumcheck
@@ -62,10 +52,7 @@ impl<C: CurveGroup> Spartan<C> {
 
         let hyrax = Hyrax::new(n, num_bases);
 
-        Self {
-            hyrax,
-            _marker: PhantomData,
-        }
+        Self { hyrax }
     }
 
     pub fn prove(
@@ -75,21 +62,19 @@ impl<C: CurveGroup> Spartan<C> {
         r1cs_input: &[ScalarField<C>],
         transcript: &mut Transcript<C>,
     ) -> (SpartanProof<C>, Vec<ScalarField<C>>) {
-        // Multilinear extension requires the number of evaluations
-        // to be a power of two to uniquely determine the polynomial
+        // Pad the witness vector to make the length a power of two
         let mut padded_r1cs_witness = r1cs_witness.to_vec();
         padded_r1cs_witness.resize(
             padded_r1cs_witness.len().next_power_of_two(),
             ScalarField::<C>::ZERO,
         );
 
+        // Construct the `Z` vector from the witness and input
         let Z = R1CS::construct_z(r1cs_witness, r1cs_input);
 
         // Commit the witness polynomial
         let comm_witness_timer = profiler_start("Commit witness");
-        let mut rng = thread_rng();
-        let blinder = ScalarField::<C>::rand(&mut rng);
-        let committed_witness = self.hyrax.commit(padded_r1cs_witness.clone(), blinder);
+        let committed_witness = self.hyrax.commit(padded_r1cs_witness.clone());
         profiler_end(comm_witness_timer);
 
         // Add the witness commitment to the transcript
@@ -101,23 +86,21 @@ impl<C: CurveGroup> Spartan<C> {
 
         let m = (r1cs.z_len() as f64).log2() as usize;
 
-        let mut Az_poly = r1cs.A.mul_vector(&Z);
-        let mut Bz_poly = r1cs.B.mul_vector(&Z);
-        let mut Cz_poly = r1cs.C.mul_vector(&Z);
+        // Multiply the A, B, and C matrices with the Z vector
+        let mut Az = r1cs.A.mul_vector(&Z);
+        let mut Bz = r1cs.B.mul_vector(&Z);
+        let mut Cz = r1cs.C.mul_vector(&Z);
 
-        Az_poly.resize(Z.len(), ScalarField::<C>::ZERO);
-        Bz_poly.resize(Z.len(), ScalarField::<C>::ZERO);
-        Cz_poly.resize(Z.len(), ScalarField::<C>::ZERO);
-
-        // Prove that the
-        // Q(t) = \sum_{x \in {0, 1}^m} (Az_poly(x) * Bz_poly(x) - Cz_poly(x)) eq(t, x)
-        // is a zero-polynomial using the sum-check protocol.
-        // We evaluate Q(t) at $\tau$ and check that it is zero.
+        // Resize the vectors so we can apply the sumcheck
+        Az.resize(Z.len(), ScalarField::<C>::ZERO);
+        Bz.resize(Z.len(), ScalarField::<C>::ZERO);
+        Cz.resize(Z.len(), ScalarField::<C>::ZERO);
 
         let tau = transcript.challenge_scalars(m, b"tau");
 
         // We implement the zero-knowledge sumcheck protocol
-        // described in Section 4.1 https://eprint.iacr.org/2019/317.pdf
+        // described in Section 4.1 https://eprint.iacr.org/2019/317.pdf.
+        // We use this blinder polynomial for both the first and second sumcheck.
         let init_blinder_poly_timer = profiler_start("Init blinder poly");
         let (sc1_blinder_poly, sc1_blinder_poly_comm) =
             init_blinder_poly(m, 3, &self.hyrax, transcript);
@@ -125,8 +108,9 @@ impl<C: CurveGroup> Spartan<C> {
 
         let sc_phase_1_timer = profiler_start("Sumcheck phase 1");
 
-        let sc_phase_1 = SumCheckPhase1::new(Az_poly.clone(), Bz_poly.clone(), Cz_poly.clone());
+        let sc_phase_1 = SumCheckPhase1::new(Az.clone(), Bz.clone(), Cz.clone());
         let (sc_proof_1, (v_A, v_B, v_C), rx) = sc_phase_1.prove(
+            m,
             &self.hyrax,
             tau,
             sc1_blinder_poly.sum,
@@ -143,8 +127,6 @@ impl<C: CurveGroup> Spartan<C> {
 
         // Phase 2
         let r = transcript.challenge_scalars(3, b"r");
-
-        // T_2 should equal teh evaluations of the random linear combined polynomials
 
         let sc_phase_2_timer = profiler_start("Sumcheck phase 2");
         let sc_phase_2 = SumCheckPhase2::new(
@@ -170,6 +152,7 @@ impl<C: CurveGroup> Spartan<C> {
         profiler_end(sc_phase_2_timer);
 
         let z_open_timer = profiler_start("Open witness poly");
+
         // Prove the evaluation of the polynomial Z(y) at ry
         let z_eval_proof = self
             .hyrax
@@ -324,7 +307,7 @@ mod tests {
 
     #[test]
     fn test_spartan() {
-        let num_cons = 2usize.pow(10);
+        let num_cons = 2usize.pow(4);
 
         let synthesizer = mock_circuit(num_cons);
         let mut cs = ConstraintSystem::new();

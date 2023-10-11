@@ -16,6 +16,7 @@ impl<C: CurveGroup> Gens<C> {
         let mut rng: StdRng = SeedableRng::from_seed(seed);
         let mut G: Vec<C> = Vec::new();
         let mut G_affine: Vec<C::Affine> = Vec::new();
+
         for _ in 0..n {
             let G_i = C::Affine::rand(&mut rng);
             G_affine.push(G_i);
@@ -23,7 +24,6 @@ impl<C: CurveGroup> Gens<C> {
         }
 
         let H: C = C::Affine::rand(&mut rng).into();
-
         let u = C::Affine::rand(&mut rng).into();
 
         Self {
