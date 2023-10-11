@@ -62,3 +62,56 @@ pub fn synthetic_circuit<F: PrimeField>(
 
     (synthesizer, pub_input, priv_input, witness)
 }
+
+// 1. Test that the circuit is satisfiable when thew witness and the public input are valid
+// 2. Test that the circuit unsatisfiable when the witness or the public input is invalid.
+pub fn test_satisfiability<F: PrimeField>(
+    synthesizer: impl Fn(&mut ConstraintSystem<F>),
+    pub_inputs: &[F],
+    priv_inputs: &[F],
+) {
+    let mut cs = ConstraintSystem::<F>::new();
+    cs.set_constraints(&synthesizer);
+
+    let mut witness = cs.gen_witness(&synthesizer, &pub_inputs, &priv_inputs);
+
+    // assert!(cs.is_sat(&witness, &pub_inputs));
+
+    // Should assert when the witness is invalid
+    for i in 0..cs.num_vars() {
+        witness[i] += F::from(3u32);
+        assert_eq!(cs.is_sat(&witness, &pub_inputs), false);
+        witness[i] -= F::from(3u32);
+    }
+
+    // Should assert when the public inputs are invalid
+    let mut pub_inputs = pub_inputs.to_vec();
+    for i in 0..pub_inputs.len() {
+        pub_inputs[i] += F::from(3u32);
+        assert_eq!(cs.is_sat(&witness, &pub_inputs), false);
+    }
+}
+
+// 1. Test that the circuit is satisfiable when thew witness and the public input are valid
+// 2. Test that the circuit unsatisfiable when the public input is invalid.
+// We need this separate from `test_satisfiability` because some circuits are satisfiable even when the witness is
+// randomly modified.
+pub fn test_var_pub_input<F: PrimeField>(
+    synthesizer: impl Fn(&mut ConstraintSystem<F>),
+    pub_inputs: &[F],
+    priv_inputs: &[F],
+) {
+    let mut cs = ConstraintSystem::<F>::new();
+    cs.set_constraints(&synthesizer);
+
+    let witness = cs.gen_witness(&synthesizer, &pub_inputs, &priv_inputs);
+
+    assert!(cs.is_sat(&witness, &pub_inputs));
+
+    // Should assert when the public inputs are invalid
+    let mut pub_inputs = pub_inputs.to_vec();
+    for i in 0..pub_inputs.len() {
+        pub_inputs[i] += F::from(1u32);
+        assert_eq!(cs.is_sat(&witness, &pub_inputs), false);
+    }
+}

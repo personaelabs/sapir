@@ -18,14 +18,13 @@ pub fn ec_double<F: PrimeField>(p: AffinePoint<F>, cs: &mut ConstraintSystem<F>)
 
 #[cfg(test)]
 mod tests {
-
+    use super::*;
+    use crate::test_satisfiability;
     use ark_ec::{AffineRepr, CurveGroup};
     use ark_secp256k1::Affine as Secp256k1Affine;
     use ark_secp256k1::Fr;
 
     type F = ark_secq256k1::Fr;
-
-    use super::*;
 
     #[test]
     fn test_ec_double() {
@@ -47,10 +46,6 @@ mod tests {
         let pub_input = [p_double.x, p_double.y];
         let priv_input = [p.x, p.y];
 
-        let mut cs = ConstraintSystem::new();
-        let witness = cs.gen_witness(synthesizer, &pub_input, &priv_input);
-
-        cs.set_constraints(&synthesizer);
-        assert!(cs.is_sat(&witness, &pub_input));
+        test_satisfiability(synthesizer, &pub_input, &priv_input);
     }
 }

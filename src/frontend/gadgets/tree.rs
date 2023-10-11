@@ -44,6 +44,8 @@ mod tests {
     use merkle_tree::MerkleTree;
     use poseidon::constants::secp256k1_w3;
 
+    use crate::test_var_pub_input;
+
     use super::*;
 
     type F = ark_secp256k1::Fq;
@@ -83,7 +85,6 @@ mod tests {
         let leaf = leaves[3];
         let merkle_proof = tree.create_proof(leaf);
 
-        let mut cs = ConstraintSystem::new();
         let mut priv_input = vec![];
         priv_input.push(leaf);
         priv_input.extend_from_slice(&merkle_proof.siblings);
@@ -96,9 +97,7 @@ mod tests {
         );
 
         let pub_input = [expected_root];
-        let witness = cs.gen_witness(synthesizer, &pub_input, &priv_input);
 
-        cs.set_constraints(&synthesizer);
-        assert!(cs.is_sat(&witness, &pub_input));
+        test_var_pub_input(synthesizer, &pub_input, &priv_input)
     }
 }

@@ -149,3 +149,51 @@ impl<F: PrimeField, const WIDTH: usize> PoseidonChip<F, WIDTH> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::frontend::test_utils::test_satisfiability;
+    use poseidon::{constants::secp256k1_w3, Poseidon};
+
+    type F = ark_secq256k1::Fr;
+
+    #[test]
+    fn test_poseidon() {
+        const WIDTH: usize = 3;
+        let tag = F::from(3);
+
+        let synthesizer = |cs: &mut ConstraintSystem<_>| {
+            let a = cs.alloc_priv_input();
+            let b = cs.alloc_priv_input();
+
+            let mut poseidon_chip = PoseidonChip::<_, WIDTH>::new(cs, secp256k1_w3());
+            poseidon_chip.state[0] = a;
+            poseidon_chip.state[1] = a;
+            poseidon_chip.state[2] = b;
+
+            poseidon_chip.permute();
+
+            let out = poseidon_chip.state[1];
+            cs.expose_public(out);
+        };
+
+        let mut poseidon = Poseidon::<F, WIDTH>::new(secp256k1_w3());
+
+        let a = F::from(3);
+        let b = F::from(4);
+
+        poseidon.state[0] = tag;
+        poseidon.state[1] = a;
+        poseidon.state[2] = b;
+
+        poseidon.permute();
+
+        let expected_out = poseidon.state[1];
+
+        let priv_input = [a, b];
+        let pub_input = [expected_out];
+
+        test_satisfiability(synthesizer, &pub_input, &priv_input);
+    }
+}

@@ -28,18 +28,19 @@ pub fn ec_mul<F: PrimeField>(
 
 #[cfg(test)]
 mod tests {
-    use ark_ff::BigInteger;
-    use ark_ff::PrimeField;
-    use ark_secp256k1::Fr;
-
-    use ark_ec::{AffineRepr, CurveGroup};
-    use ark_secp256k1::Affine as Secp256k1Affine;
-    type Fp = ark_secp256k1::Fq;
+    use crate::test_var_pub_input;
 
     use super::*;
+    use ark_ec::{AffineRepr, CurveGroup};
+    use ark_ff::BigInteger;
+    use ark_ff::PrimeField;
+    use ark_secp256k1::Affine as Secp256k1Affine;
+    use ark_secp256k1::Fr;
+
+    type Fp = ark_secp256k1::Fq;
 
     #[test]
-    pub fn test_mul() {
+    pub fn test_ec_mul() {
         let synthesizer = |cs: &mut ConstraintSystem<Fp>| {
             let p_x = cs.alloc_priv_input();
             let p_y = cs.alloc_priv_input();
@@ -70,11 +71,6 @@ mod tests {
         let mut priv_input = vec![p.x, p.y];
         priv_input.extend_from_slice(&s_bits);
 
-        let mut cs = ConstraintSystem::new();
-        let witness = cs.gen_witness(synthesizer, &pub_input, &priv_input);
-
-        cs.set_constraints(&synthesizer);
-
-        assert!(cs.is_sat(&witness, &pub_input));
+        test_var_pub_input(synthesizer, &pub_input, &priv_input);
     }
 }

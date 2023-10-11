@@ -68,13 +68,14 @@ pub fn ec_add_complete<F: PrimeField>(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::test_satisfiability;
+    use crate::test_var_pub_input;
     use ark_ec::{AffineRepr, CurveGroup};
     use ark_secp256k1::Affine as Secp256k1Affine;
     use ark_secp256k1::Fr;
 
     type F = ark_secq256k1::Fr;
-
-    use super::*;
 
     fn add_incomplete_circuit<F: PrimeField>(cs: &mut ConstraintSystem<F>) {
         let p_x = cs.alloc_priv_input();
@@ -104,12 +105,7 @@ mod tests {
         let pub_input = vec![out.x, out.y];
         let priv_input = vec![p.x, p.y, q.x, q.y];
 
-        let mut cs = ConstraintSystem::<F>::new();
-        let witness = cs.gen_witness(add_incomplete_circuit, &pub_input, &priv_input);
-
-        cs.set_constraints(&synthesizer);
-
-        assert!(cs.is_sat(&witness, &pub_input));
+        test_satisfiability(synthesizer, &pub_input, &priv_input);
     }
 
     fn add_complete_circuit<F: PrimeField>(cs: &mut ConstraintSystem<F>) {
@@ -145,17 +141,12 @@ mod tests {
             (p_nonzero, q_nonzero),
         ];
 
-        let mut cs = ConstraintSystem::<F>::new();
-        cs.set_constraints(&synthesizer);
-
         for (p, q) in cases {
             let out = (p + q).into_affine();
             let pub_input = vec![out.x, out.y];
             let priv_input = vec![p.x, p.y, q.x, q.y];
 
-            let witness = cs.gen_witness(synthesizer, &pub_input, &priv_input);
-
-            assert!(cs.is_sat(&witness, &pub_input));
+            test_var_pub_input(synthesizer, &pub_input, &priv_input);
         }
     }
 }

@@ -1144,9 +1144,8 @@ macro_rules! init_constraint_system {
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
-    use crate::frontend::test_utils::synthetic_circuit;
+    use crate::frontend::test_utils::{synthetic_circuit, test_satisfiability, test_var_pub_input};
     use ark_ff::Field;
 
     type F = ark_secq256k1::Fr;
@@ -1206,59 +1205,6 @@ mod tests {
     // ########## Test the primitive operations ############
     // ########################################
 
-    // 1. Test that the circuit is satisfiable when thew witness and the public input are valid
-    // 2. Test that the circuit unsatisfiable when the witness or the public input is invalid.
-    fn test_circuit<F: PrimeField>(
-        synthesizer: impl Fn(&mut ConstraintSystem<F>),
-        pub_inputs: &[F],
-        priv_inputs: &[F],
-    ) {
-        let mut cs = ConstraintSystem::<F>::new();
-        cs.set_constraints(&synthesizer);
-
-        let mut witness = cs.gen_witness(&synthesizer, &pub_inputs, &priv_inputs);
-
-        assert!(cs.is_sat(&witness, &pub_inputs));
-
-        // Should assert when the witness is invalid
-        for i in 0..cs.num_vars() {
-            witness[i] += F::from(3u32);
-            assert_eq!(cs.is_sat(&witness, &pub_inputs), false);
-            witness[i] -= F::from(3u32);
-        }
-
-        // Should assert when the public inputs are invalid
-        let mut pub_inputs = pub_inputs.to_vec();
-        for i in 0..pub_inputs.len() {
-            pub_inputs[i] += F::from(3u32);
-            assert_eq!(cs.is_sat(&witness, &pub_inputs), false);
-        }
-    }
-
-    // 1. Test that the circuit is satisfiable when thew witness and the public input are valid
-    // 2. Test that the circuit unsatisfiable when the public input is invalid.
-    // We need this separate from `test_circuit` because some circuits are satisfiable even when the witness is
-    // randomly modified.
-    fn test_var_pub_input<F: PrimeField>(
-        synthesizer: impl Fn(&mut ConstraintSystem<F>),
-        pub_inputs: &[F],
-        priv_inputs: &[F],
-    ) {
-        let mut cs = ConstraintSystem::<F>::new();
-        cs.set_constraints(&synthesizer);
-
-        let witness = cs.gen_witness(&synthesizer, &pub_inputs, &priv_inputs);
-
-        assert!(cs.is_sat(&witness, &pub_inputs));
-
-        // Should assert when the public inputs are invalid
-        let mut pub_inputs = pub_inputs.to_vec();
-        for i in 0..pub_inputs.len() {
-            pub_inputs[i] += F::from(1u32);
-            assert_eq!(cs.is_sat(&witness, &pub_inputs), false);
-        }
-    }
-
     // Test the primitive operations `add`, `sub`, and `div`.
     // `mul` is for some reason a private function in `F` so we cannot test it here.
     macro_rules! test_op {
@@ -1279,7 +1225,7 @@ mod tests {
             let c = a.$op(b);
             let priv_inputs = [a, b];
             let pub_inputs = [c];
-            test_circuit(synthesizer, &pub_inputs, &priv_inputs);
+            test_satisfiability(synthesizer, &pub_inputs, &priv_inputs);
         };
     }
 
@@ -1302,7 +1248,7 @@ mod tests {
             let a_assigned = a.$op_assign(b);
             let priv_inputs = [a, b];
             let pub_inputs = [a_assigned];
-            test_circuit(synthesizer, &pub_inputs, &priv_inputs);
+            test_satisfiability(synthesizer, &pub_inputs, &priv_inputs);
         };
     }
 
@@ -1337,7 +1283,7 @@ mod tests {
         let c = a * b;
         let priv_inputs = [a, b];
         let pub_inputs = [c];
-        test_circuit(synthesizer, &pub_inputs, &priv_inputs);
+        test_satisfiability(synthesizer, &pub_inputs, &priv_inputs);
     }
 
     #[test]
@@ -1435,7 +1381,7 @@ mod tests {
         let c = a / b;
         let priv_inputs = [a, b];
         let pub_inputs = [c];
-        test_circuit(synthesizer, &pub_inputs, &priv_inputs);
+        test_satisfiability(synthesizer, &pub_inputs, &priv_inputs);
 
         // Divide by 0
 
@@ -1465,7 +1411,7 @@ mod tests {
         let d = a * b + c;
         let priv_inputs = [a, b, c];
         let pub_inputs = [d];
-        test_circuit(synthesizer, &pub_inputs, &priv_inputs);
+        test_satisfiability(synthesizer, &pub_inputs, &priv_inputs);
     }
 
     #[test]

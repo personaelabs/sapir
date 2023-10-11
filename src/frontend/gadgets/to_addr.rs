@@ -180,7 +180,7 @@ pub fn to_addr<F: PrimeField>(input: [Wire<F>; 512]) -> Wire<F> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::frontend::constraint_system::ConstraintSystem;
+    use crate::{frontend::constraint_system::ConstraintSystem, test_var_pub_input};
     use ark_ff::Field;
     use num_bigint::BigUint;
     type F = ark_secq256k1::Fr;
@@ -219,15 +219,10 @@ mod tests {
             to_addr_circuit(cs);
         };
 
-        let mut cs = ConstraintSystem::new();
-
         let priv_input = pub_key_bits;
         let addr = F::from(BigUint::from_bytes_be(&expected_address));
         let pub_input = [addr];
 
-        let witness = cs.gen_witness(synthesizer, &pub_input, &priv_input);
-
-        cs.set_constraints(&synthesizer);
-        assert!(cs.is_sat(&witness, &pub_input));
+        test_var_pub_input(synthesizer, &pub_input, &priv_input);
     }
 }

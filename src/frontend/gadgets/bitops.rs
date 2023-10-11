@@ -97,7 +97,7 @@ pub fn byte_to_le_bits<F: PrimeField>(byte: Wire<F>) -> Vec<Wire<F>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::frontend::constraint_system::ConstraintSystem;
+    use crate::{frontend::constraint_system::ConstraintSystem, test_var_pub_input};
     use ark_ff::{Field, PrimeField};
 
     type Fp = ark_secq256k1::Fr;
@@ -118,11 +118,7 @@ mod tests {
         let priv_input = bits;
         let pub_input = vec![expected];
 
-        let mut cs = ConstraintSystem::new();
-        let witness = cs.gen_witness(synthesizer, &pub_input, &priv_input);
-
-        cs.set_constraints(&synthesizer);
-        assert!(cs.is_sat(&witness, &pub_input));
+        test_var_pub_input(synthesizer, &pub_input, &priv_input);
     }
 
     #[test]
@@ -148,10 +144,6 @@ mod tests {
         let priv_input = [val];
         let pub_input = expected_bits;
 
-        let mut cs = ConstraintSystem::new();
-        let witness = cs.gen_witness(synthesizer, &pub_input, &priv_input);
-
-        cs.set_constraints(&synthesizer);
-        assert!(cs.is_sat(&witness, &pub_input));
+        test_var_pub_input(synthesizer, &pub_input, &priv_input);
     }
 }
