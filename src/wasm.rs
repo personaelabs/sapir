@@ -147,6 +147,7 @@ mod tests {
     use crate::timer::{timer_end, timer_start};
     use crate::ScalarField;
     use ark_ff::{BigInteger, PrimeField};
+    use std::panic;
 
     type Curve = ark_secq256k1::Projective;
     type F = ark_secq256k1::Fr;
@@ -165,16 +166,10 @@ mod tests {
         assert_eq!(felts, felts_recovered);
     }
 
-    #[test]
-    fn test_client_prove() {
-        const NUM_CONS: usize = 2usize.pow(4);
-        circuit!(mock_circuit(NUM_CONS), Curve, b"test_client_prove");
+    const NUM_CONS: usize = 2usize.pow(4);
+    circuit!(mock_circuit(NUM_CONS), Curve, b"test_client_prove");
 
-        let priv_input = [F::from(3), F::from(4)];
-        let pub_input = [priv_input[0] * priv_input[1]];
-
-        prepare();
-
+    fn prove_and_verify(pub_input: &[F], priv_input: &[F]) {
         let pub_input_bytes = pub_input
             .iter()
             .map(|x| x.into_bigint().to_bytes_be())
@@ -194,5 +189,22 @@ mod tests {
         let verify_timer = timer_start("Verification time");
         assert!(client_verify(&proof_bytes));
         timer_end(verify_timer);
+    }
+
+    #[test]
+    fn test_client_prove() {
+        let priv_input = [F::from(3), F::from(4)];
+        let pub_input = [priv_input[0] * priv_input[1]];
+
+        prepare();
+
+        prove_and_verify(&pub_input, &priv_input);
+
+        let mut invalid_pub_input = pub_input;
+        invalid_pub_input[0] = F::from(0);
+
+        // Test with invalid public input
+        let result = panic::catch_unwind(|| prove_and_verify(&invalid_pub_input, &priv_input));
+        assert!(result.is_err());
     }
 }
