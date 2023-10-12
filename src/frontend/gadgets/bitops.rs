@@ -53,10 +53,11 @@ pub fn bit_xor<F: PrimeField>(a: Wire<F>, b: Wire<F>) -> Wire<F> {
     )
 }
 
-// Little-endian bits to byte
-pub fn le_bits_to_byte<F: PrimeField>(bits: &[Wire<F>]) -> Wire<F> {
+// Little-endian bits to value
+pub fn form_le_bits<F: PrimeField>(bits: &[Wire<F>]) -> Wire<F> {
     let cs = bits[0].cs();
-    let mut terms = Vec::with_capacity(8);
+
+    let mut terms = Vec::with_capacity(bits.len());
 
     let mut pow = F::from(1u32);
     for bit in bits.iter() {
@@ -67,29 +68,25 @@ pub fn le_bits_to_byte<F: PrimeField>(bits: &[Wire<F>]) -> Wire<F> {
     cs.sum(&terms)
 }
 
-// Byte to little-endian bits
-pub fn byte_to_le_bits<F: PrimeField>(byte: Wire<F>) -> Vec<Wire<F>> {
-    let cs = byte.cs();
+// Value to little-endian bits
+pub fn to_le_bits<F: PrimeField>(x: Wire<F>) -> Vec<Wire<F>> {
+    let cs = x.cs();
 
-    let bits = (0..8).map(|_| cs.alloc_var(F::ZERO)).collect::<Vec<_>>();
+    let bits = (0..F::MODULUS_BIT_SIZE)
+        .map(|_| cs.alloc_var(F::ZERO))
+        .collect::<Vec<_>>();
 
     if cs.is_witness_gen() {
-        let a_assigned = cs.wires[byte.index];
-        let mut a_bits = a_assigned.into_bigint().to_bits_le()[..8].to_vec();
-        println!("a_bits: {:?}", a_bits);
-        a_bits.resize(8, false);
+        let x_assigned = cs.wires[x.index];
+        let x_bits = x_assigned.into_bigint().to_bits_le();
 
-        for (i, b) in a_bits.iter().enumerate() {
+        for (i, b) in x_bits.iter().enumerate() {
             cs.wires[bits[i].index] = F::from(*b);
         }
     }
 
-    let recovered_byte = le_bits_to_byte(&bits);
-    println!("byte: ");
-    byte.println();
-    println!("recovered_byte: ");
-    recovered_byte.println();
-    cs.assert_equal(byte, recovered_byte, "");
+    let recovered_x = form_le_bits(&bits);
+    cs.assert_equal(x, recovered_x, "");
 
     bits
 }
@@ -103,15 +100,15 @@ mod tests {
     type Fp = ark_secq256k1::Fr;
 
     #[test]
-    pub fn test_le_bits_to_byte() {
+    pub fn test_from_le_bits() {
         let synthesizer = |cs: &mut ConstraintSystem<Fp>| {
-            let bits = cs.alloc_priv_inputs(8);
-            let out = le_bits_to_byte(&bits);
+            let bits = cs.alloc_priv_inputs(Fp::MODULUS_BIT_SIZE as usize);
+            let out = form_le_bits(&bits);
 
             cs.expose_public(out);
         };
 
-        let mut bits = vec![Fp::ZERO; 8];
+        let mut bits = vec![Fp::ZERO; Fp::MODULUS_BIT_SIZE as usize];
         bits[2] = Fp::ONE;
         let expected = Fp::from(4);
 
@@ -122,10 +119,10 @@ mod tests {
     }
 
     #[test]
-    fn test_byte_to_le_bits() {
+    fn test_to_le_bits() {
         let synthesizer = |cs: &mut ConstraintSystem<Fp>| {
             let val = cs.alloc_priv_input();
-            let out = byte_to_le_bits(val);
+            let out = to_le_bits(val);
 
             for out_i in out {
                 cs.expose_public(out_i);
@@ -133,13 +130,12 @@ mod tests {
         };
 
         let val = Fp::from(123);
-        let mut expected_bits = val
+        let expected_bits = val
             .into_bigint()
             .to_bits_le()
             .iter()
             .map(|b| Fp::from(*b))
             .collect::<Vec<Fp>>();
-        expected_bits.resize(8, Fp::ZERO);
 
         let priv_input = [val];
         let pub_input = expected_bits;
