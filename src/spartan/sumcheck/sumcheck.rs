@@ -110,8 +110,8 @@ pub fn init_blinder_poly<C: CurveGroup>(
     profiler_end(commit_b_timer);
 
     // Append the sum and the commitment of the blinder polynomial to the transcript.
-    transcript.append_scalar(blinder_poly.sum);
-    transcript.append_point(blinder_poly_comm.comm);
+    transcript.append_scalar(b"blinder_poly_sum", blinder_poly.sum);
+    transcript.append_point(b"blinder_poly_comm", blinder_poly_comm.comm);
 
     (blinder_poly, blinder_poly_comm)
 }
@@ -244,8 +244,8 @@ pub fn verify_sum<C: CurveGroup>(
     compute_inters: bool,
 ) -> (Option<IPAInters<C>>, Vec<ScalarField<C>>) {
     // Append the sum and the commitment to the blinder polynomial to the transcript.
-    transcript.append_scalar(proof.blinder_poly_sum);
-    transcript.append_point(proof.blinder_poly_eval_proof.comm);
+    transcript.append_scalar(b"blinder_poly_sum", proof.blinder_poly_sum);
+    transcript.append_point(b"blinder_poly_comm", proof.blinder_poly_eval_proof.comm);
 
     // Get the challenge to combine the blinder polynomial with the summed polynomial(s).
     let rho = transcript.challenge_scalar(label);

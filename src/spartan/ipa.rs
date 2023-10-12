@@ -122,7 +122,7 @@ impl<C: CurveGroup> IPA<C> {
         let mut ck = self.gens.clone();
 
         // Add the the claimed evaluation to the transcript
-        transcript.append_scalar(y);
+        transcript.append_scalar(b"claimed_eval", y);
 
         // Get a challenge to rescale the basis
         let x = transcript.challenge_scalar(b"x");
@@ -169,8 +169,8 @@ impl<C: CurveGroup> IPA<C> {
             R_vec.push(R);
 
             // Append L and R to the transcript
-            transcript.append_point(L);
-            transcript.append_point(R);
+            transcript.append_point(b"L", L);
+            transcript.append_point(b"R", R);
 
             let u = transcript.challenge_scalar(b"r");
             let u_inv = u.inverse().unwrap();
@@ -232,7 +232,7 @@ impl<C: CurveGroup> IPA<C> {
         let a_final = a[0];
         let R = (G_final + (ck.u.unwrap() * b_final).into_affine()) * d + (ck.H.unwrap() * s);
 
-        transcript.append_point(R);
+        transcript.append_point(b"R", R);
         let c = transcript.challenge_scalar(b"c");
 
         let z1 = d + (c * a_final);
@@ -285,7 +285,7 @@ impl<C: CurveGroup> IPA<C> {
         let n = b.len();
 
         // Append the claimed evaluation to the transcript
-        transcript.append_scalar(proof.y);
+        transcript.append_scalar(b"claimed_eval", proof.y);
 
         // Rescale `u`
         let x = transcript.challenge_scalar(b"x");
@@ -297,8 +297,8 @@ impl<C: CurveGroup> IPA<C> {
             .iter()
             .zip(proof.R_vec.iter())
             .map(|(L, R)| {
-                transcript.append_point(*L);
-                transcript.append_point(*R);
+                transcript.append_point(b"L", *L);
+                transcript.append_point(b"R", *R);
                 transcript.challenge_scalar(b"r")
             })
             .collect::<Vec<ScalarField<C>>>();
@@ -344,7 +344,7 @@ impl<C: CurveGroup> IPA<C> {
 
         // Verify the zero-knowledge opening
 
-        transcript.append_point(proof.R);
+        transcript.append_point(b"R", proof.R);
         let c = transcript.challenge_scalar(b"c");
 
         let lhs = (Q * c).into_affine() + proof.R;

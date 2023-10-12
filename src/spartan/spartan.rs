@@ -78,7 +78,7 @@ impl<C: CurveGroup> Spartan<C> {
         profiler_end(comm_witness_timer);
 
         // Add the witness commitment to the transcript
-        transcript.append_points(&committed_witness.T);
+        transcript.append_points(b"T", &committed_witness.T);
 
         // ############################
         // Phase 1
@@ -121,9 +121,9 @@ impl<C: CurveGroup> Spartan<C> {
 
         profiler_end(sc_phase_1_timer);
 
-        transcript.append_scalar(v_A);
-        transcript.append_scalar(v_B);
-        transcript.append_scalar(v_C);
+        transcript.append_scalar(b"v_A", v_A);
+        transcript.append_scalar(b"v_B", v_B);
+        transcript.append_scalar(b"v_C", v_C);
 
         // Phase 2
         let r = transcript.challenge_scalars(3, b"r");
@@ -183,7 +183,7 @@ impl<C: CurveGroup> Spartan<C> {
         transcript: &mut Transcript<C>,
         compute_inters: bool,
     ) -> Option<SpartanVerifyInters<C>> {
-        transcript.append_points(&proof.z_eval_proof.T);
+        transcript.append_points(b"T", &proof.z_eval_proof.T);
 
         let A_mle = r1cs.A.to_ml_extension();
         let B_mle = r1cs.B.to_ml_extension();
@@ -224,9 +224,9 @@ impl<C: CurveGroup> Spartan<C> {
         // Verify phase 2 sumcheck
         // ############################
 
-        transcript.append_scalar(v_A);
-        transcript.append_scalar(v_B);
-        transcript.append_scalar(v_C);
+        transcript.append_scalar(b"v_A", v_A);
+        transcript.append_scalar(b"v_B", v_B);
+        transcript.append_scalar(b"v_C", v_C);
 
         let r = transcript.challenge_scalars(3, b"r");
         let r_A = r[0];

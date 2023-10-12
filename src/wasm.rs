@@ -30,7 +30,7 @@ use prelude::*;
 
 #[macro_export]
 macro_rules! circuit {
-    ($synthesizer:expr, $curve:ty) => {
+    ($synthesizer:expr, $curve:ty, $label:expr) => {
         static CIRCUIT: Mutex<R1CS<ScalarField<$curve>>> = Mutex::new(R1CS::empty());
 
         static CONSTRAINT_SYSTEM: Mutex<ConstraintSystem<ScalarField<$curve>>> =
@@ -65,7 +65,7 @@ macro_rules! circuit {
 
             // Generate the proof
             let spartan = Spartan::new(circuit.z_len());
-            let mut transcript = Transcript::new(b"Spartan");
+            let mut transcript = Transcript::new($label);
 
             let proof = spartan.prove(&circuit, &witness, pub_input, &mut transcript);
             proof.0
@@ -75,7 +75,7 @@ macro_rules! circuit {
             let circuit = CIRCUIT.lock().unwrap().clone();
 
             let spartan = Spartan::new(circuit.z_len());
-            let mut transcript = Transcript::new(b"Spartan");
+            let mut transcript = Transcript::new($label);
             spartan.verify(&circuit, &proof, &mut transcript, false);
 
             true
@@ -168,7 +168,7 @@ mod tests {
     #[test]
     fn test_client_prove() {
         const NUM_CONS: usize = 2usize.pow(4);
-        circuit!(mock_circuit(NUM_CONS), Curve);
+        circuit!(mock_circuit(NUM_CONS), Curve, b"test_client_prove");
 
         let priv_input = [F::from(3), F::from(4)];
         let pub_input = [priv_input[0] * priv_input[1]];
