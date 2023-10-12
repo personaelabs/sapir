@@ -19,7 +19,7 @@ use ark_ec::CurveGroup;
 use ark_ff::Field;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 
-#[derive(CanonicalDeserialize, CanonicalSerialize)]
+#[derive(Clone, CanonicalDeserialize, CanonicalSerialize)]
 pub struct SpartanProof<C: CurveGroup> {
     pub pub_input: Vec<ScalarField<C>>,
     pub sc_proof_1: SumCheckProof<C>,
@@ -293,14 +293,13 @@ impl<C: CurveGroup> Spartan<C> {
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
-
     use crate::{
         constraint_system::ConstraintSystem,
         frontend::test_utils::mock_circuit,
         timer::{timer_end, timer_start},
     };
+    use std::panic;
 
     type Curve = ark_secq256k1::Projective;
     type F = ark_secq256k1::Fr;
@@ -323,15 +322,26 @@ mod tests {
         let mut prover_transcript = Transcript::new(b"test_spartan");
         let proof_gen_timer = timer_start("Prove");
         let (proof, _) = spartan.prove(&r1cs, &witness, &pub_input, &mut prover_transcript);
-
         timer_end(proof_gen_timer);
+
+        // Verify a valid proof
 
         let mut verifier_transcript = Transcript::new(b"test_spartan");
         let proof_verify_timer = timer_start("Verify");
-        let _inters = spartan
-            .verify(&r1cs, &proof, &mut verifier_transcript, true)
-            .unwrap();
+        spartan.verify(&r1cs, &proof, &mut verifier_transcript, true);
 
         timer_end(proof_verify_timer);
+
+        // Verify an invalid proof
+
+        let mut invalid_proof = proof;
+        invalid_proof.pub_input[0] += F::ONE;
+
+        let result = panic::catch_unwind(|| {
+            let mut verifier_transcript = Transcript::new(b"test_spartan");
+            spartan.verify(&r1cs, &invalid_proof, &mut verifier_transcript, true);
+        });
+
+        assert!(result.is_err(), "Should assert invalid public input");
     }
 }
