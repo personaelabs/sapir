@@ -63,6 +63,8 @@ macro_rules! circuit {
             let mut cs = CONSTRAINT_SYSTEM.lock().unwrap();
             let witness = cs.gen_witness($synthesizer, pub_input, priv_input);
 
+            assert!(cs.is_sat(&witness, &pub_input));
+
             // Generate the proof
             let spartan = Spartan::new(circuit.z_len());
             let mut transcript = Transcript::new($label);
