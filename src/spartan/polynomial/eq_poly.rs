@@ -23,7 +23,7 @@ impl<F: PrimeField> EqPoly<F> {
     }
 
     // Evaluate the polynomial at `x` as bits
-    pub fn eval_as_bits(&self, x: usize) -> F {
+    pub fn eval_as_bits(&self, x: u64) -> F {
         let mut result = F::ONE;
         let one = F::ONE;
 

@@ -5,12 +5,12 @@ use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 
 #[derive(Clone, Debug)]
 pub struct SparseMLPoly<F> {
-    pub evals: Vec<(usize, F)>,
+    pub evals: Vec<(u64, F)>,
     pub num_vars: usize,
 }
 
 impl<F: PrimeField> SparseMLPoly<F> {
-    pub fn new(evals: Vec<(usize, F)>, num_vars: usize) -> Self {
+    pub fn new(evals: Vec<(u64, F)>, num_vars: usize) -> Self {
         Self { evals, num_vars }
     }
 
@@ -28,7 +28,7 @@ impl<F: PrimeField> SparseMLPoly<F> {
         let mut result = F::ZERO;
 
         for eval in &self.evals {
-            result += eq_evals[eval.0] * eval.1;
+            result += eq_evals[eval.0 as usize] * eval.1;
         }
 
         result

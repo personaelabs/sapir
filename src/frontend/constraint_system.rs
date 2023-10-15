@@ -237,9 +237,9 @@ pub struct ConstraintSystem<F: PrimeField> {
     A_first: BTreeMap<usize, F>,
     B_first: BTreeMap<usize, F>,
     C_first: BTreeMap<usize, F>,
-    A: BTreeMap<usize, F>,
-    B: BTreeMap<usize, F>,
-    C: BTreeMap<usize, F>,
+    A: BTreeMap<u64, F>,
+    B: BTreeMap<u64, F>,
+    C: BTreeMap<u64, F>,
     A_nonzero_coeffs: Vec<Vec<usize>>,
     B_nonzero_coeffs: Vec<Vec<usize>>,
     C_nonzero_coeffs: Vec<Vec<usize>>,
@@ -393,11 +393,11 @@ impl<F: PrimeField> ConstraintSystem<F> {
         self.alloc_const(F::ZERO)
     }
 
-    fn next_constraint_offset(&mut self) -> usize {
+    fn next_constraint_offset(&mut self) -> u64 {
         let next_constraint = self.next_constraint;
         self.next_constraint += 1;
 
-        next_constraint * self.z_len()
+        (next_constraint as u64) * (self.z_len() as u64)
     }
 
     // Assert that the given wire is binary at witness generation.
@@ -531,9 +531,9 @@ impl<F: PrimeField> ConstraintSystem<F> {
 
                 let con = self.next_constraint_offset();
 
-                let a_key = con + w.index;
-                let b_key = con + Self::ONE_WIRE_INDEX;
-                let c_key = con + w2.index;
+                let a_key = con + (w.index as u64);
+                let b_key = con + Self::ONE_WIRE_INDEX as u64;
+                let c_key = con + w2.index as u64;
 
                 self.A.insert(a_key, F::ONE);
                 self.B.insert(b_key, -F::ONE);
@@ -569,21 +569,21 @@ impl<F: PrimeField> ConstraintSystem<F> {
                 let con = self.next_constraint_offset();
 
                 for a_i in a {
-                    let a_key = con + a_i.0.index;
+                    let a_key = con + a_i.0.index as u64;
                     self.A.insert(a_key, a_i.1);
                 }
 
                 for b_i in b {
-                    let b_key = con + b_i.0.index;
+                    let b_key = con + b_i.0.index as u64;
                     self.B.insert(b_key, b_i.1);
                 }
 
                 for c_i in c {
-                    let c_key = con + c_i.0.index;
+                    let c_key = con + c_i.0.index as u64;
                     self.C.insert(c_key, -c_i.1);
                 }
 
-                let c_key = con + w3.index;
+                let c_key = con + w3.index as u64;
                 self.C.insert(c_key, F::ONE);
 
                 let a_nonzero_coeffs = a.iter().map(|(w, _)| w.index).collect();
@@ -610,9 +610,9 @@ impl<F: PrimeField> ConstraintSystem<F> {
                 // w1 * w2 - w3 = 0
                 let con = self.next_constraint_offset();
 
-                let a_key = con + w1.index;
-                let b_key = con + w2.index;
-                let c_key = con + w3.index;
+                let a_key = con + w1.index as u64;
+                let b_key = con + w2.index as u64;
+                let c_key = con + w3.index as u64;
 
                 self.A.insert(a_key, F::ONE);
                 self.B.insert(b_key, F::ONE);
@@ -639,9 +639,9 @@ impl<F: PrimeField> ConstraintSystem<F> {
                 // w1 * w2 - w3 = 0
                 let con = self.next_constraint_offset();
 
-                let a_key = con + w1.index;
-                let b_key = con + Self::ONE_WIRE_INDEX;
-                let c_key = con + w3.index;
+                let a_key = con + w1.index as u64;
+                let b_key = con + Self::ONE_WIRE_INDEX as u64;
+                let c_key = con + w3.index as u64;
 
                 self.A.insert(a_key, c);
                 self.B.insert(b_key, F::ONE);
@@ -668,10 +668,10 @@ impl<F: PrimeField> ConstraintSystem<F> {
                 // w1 * w2 - ((-1 * w3) + out)  = 0
                 let con = self.next_constraint_offset();
 
-                let a_key = con + w1.index;
-                let b_key = con + w2.index;
-                let c_key = con + w3.index;
-                let out_key = con + out.index;
+                let a_key = con + w1.index as u64;
+                let b_key = con + w2.index as u64;
+                let c_key = con + w3.index as u64;
+                let out_key = con + out.index as u64;
 
                 self.A.insert(a_key, F::ONE);
                 self.B.insert(b_key, F::ONE);
@@ -750,9 +750,9 @@ impl<F: PrimeField> ConstraintSystem<F> {
 
                 // W1 * 1 == w2
 
-                let a_key = con + w1.index;
-                let b_key = con + Self::ONE_WIRE_INDEX;
-                let c_key = con + w2.index;
+                let a_key = con + w1.index as u64;
+                let b_key = con + Self::ONE_WIRE_INDEX as u64;
+                let c_key = con + w2.index as u64;
 
                 self.A.insert(a_key, F::ONE);
                 self.B.insert(b_key, F::ONE);
@@ -787,9 +787,9 @@ impl<F: PrimeField> ConstraintSystem<F> {
 
                 let con = self.next_constraint_offset();
 
-                let a_key = con + w.index;
-                let b_key = con + w.index;
-                let c_key = con + Self::ONE_WIRE_INDEX;
+                let a_key = con + w.index as u64;
+                let b_key = con + w.index as u64;
+                let c_key = con + Self::ONE_WIRE_INDEX as u64;
 
                 self.A.insert(a_key, F::ONE);
                 self.B.insert(b_key, F::ONE);
@@ -985,12 +985,12 @@ impl<F: PrimeField> ConstraintSystem<F> {
         }
 
         for con in 1..self.num_constraints.unwrap() {
-            let offset = con * self.z_len();
+            let offset = con as u64 * self.z_len() as u64;
             for coeff_i in &self.A_nonzero_coeffs[con - 1] {
                 A_entries.push(SparseMatrixEntry {
                     row: con,
                     col: *coeff_i,
-                    val: *self.A.get(&(coeff_i + offset)).unwrap(),
+                    val: *self.A.get(&(*coeff_i as u64 + offset)).unwrap(),
                 });
             }
 
@@ -998,7 +998,7 @@ impl<F: PrimeField> ConstraintSystem<F> {
                 B_entries.push(SparseMatrixEntry {
                     row: con,
                     col: *coeff_i,
-                    val: *self.B.get(&(coeff_i + offset)).unwrap(),
+                    val: *self.B.get(&(*coeff_i as u64 + offset)).unwrap(),
                 });
             }
 
@@ -1006,7 +1006,7 @@ impl<F: PrimeField> ConstraintSystem<F> {
                 C_entries.push(SparseMatrixEntry {
                     row: con,
                     col: *coeff_i,
-                    val: *self.C.get(&(coeff_i + offset)).unwrap(),
+                    val: *self.C.get(&(*coeff_i as u64 + offset)).unwrap(),
                 });
             }
         }
@@ -1103,20 +1103,20 @@ impl<F: PrimeField> ConstraintSystem<F> {
 
         // Check rest of the constraints
         for con in 1..self.num_constraints.unwrap() {
-            let offset = con * self.z_len();
+            let offset = con as u64 * self.z_len() as u64;
             let A_eval: F = self.A_nonzero_coeffs[con - 1]
                 .iter()
-                .map(|coeff| z[*coeff] * self.A.get(&(coeff + offset)).unwrap())
+                .map(|coeff| z[*coeff] * self.A.get(&(*coeff as u64 + offset)).unwrap())
                 .sum();
 
             let B_eval: F = self.B_nonzero_coeffs[con - 1]
                 .iter()
-                .map(|coeff| z[*coeff] * self.B.get(&(coeff + offset)).unwrap())
+                .map(|coeff| z[*coeff] * self.B.get(&(*coeff as u64 + offset)).unwrap())
                 .sum();
 
             let C_eval: F = self.C_nonzero_coeffs[con - 1]
                 .iter()
-                .map(|coeff| z[*coeff] * self.C.get(&(coeff + offset)).unwrap())
+                .map(|coeff| z[*coeff] * self.C.get(&(*coeff as u64 + offset)).unwrap())
                 .sum();
 
             if A_eval * B_eval != C_eval {

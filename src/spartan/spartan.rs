@@ -246,11 +246,11 @@ impl<C: CurveGroup> Spartan<C> {
             profiler_end(eval_timer);
 
             let input = (0..r1cs.num_input)
-                .map(|i| (i + 1, proof.pub_input[i]))
-                .collect::<Vec<(usize, ScalarField<C>)>>();
+                .map(|i| ((i + 1) as u64, proof.pub_input[i]))
+                .collect::<Vec<(u64, ScalarField<C>)>>();
 
             let input_poly = SparseMLPoly::new(
-                vec![vec![(0, ScalarField::<C>::ONE)], input].concat(),
+                vec![vec![(0u64, ScalarField::<C>::ONE)], input].concat(),
                 ry.len() - 1,
             );
             let input_poly_eval = input_poly.eval(&ry[1..]);

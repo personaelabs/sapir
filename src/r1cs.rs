@@ -51,10 +51,10 @@ impl<F: PrimeField> Matrix<F> {
     pub fn to_ml_extension(&self) -> SparseMLPoly<F> {
         let mut evals = Vec::with_capacity(self.entries.len());
         let entries = &self.entries;
-        let num_cols = self.num_cols;
+        let num_cols = self.num_cols as u64;
         for i in 0..entries.len() {
-            let row = entries[i].row;
-            let col = entries[i].col;
+            let row = entries[i].row as u64;
+            let col = entries[i].col as u64;
             let val = entries[i].val;
             evals.push(((row * num_cols) + col, val));
         }
