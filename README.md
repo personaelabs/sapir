@@ -1,4 +1,4 @@
-# spartan-evm
+# sapir
 
 ## Run tests
 ```
