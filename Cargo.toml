@@ -19,9 +19,13 @@ wasm-bindgen = "0.2.87"
 console_error_panic_hook = "0.1.7"
 ark-secq256k1 = "0.4.0"
 ark-secp256k1 = "0.4.0"
+ethers = { version = "2.0", features = ["ethers-solc"], optional = true }
+# Ethers' async features rely upon the Tokio async runtime.
+tokio = { version = "1", features = ["macros"], optional = true }
+# Flexible concrete Error Reporting type built on std::error::Error with customizable Reports
 hex = "0.4.3"
 num-bigint = "0.4.4"
-poseidon = { git = "https://github.com/personaelabs/poseidon.git" }
+poseidon = { git = "https://github.com/DanTehrani/poseidon.git" }
 merkle-tree = { git = "https://github.com/personaelabs/merkle-tree.git" }
 merlin = "3.0.0"
 
@@ -29,3 +33,4 @@ merlin = "3.0.0"
 default = ["ark-std/print-trace"]
 parallel = ["rayon"]
 profiler = []
+evm-verifier = ["ethers", "tokio"]

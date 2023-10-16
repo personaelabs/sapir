@@ -4,3 +4,9 @@
 ```
 cargo test
 ```
+
+
+## Compile contracts
+```
+forge build --via-irr
+```
