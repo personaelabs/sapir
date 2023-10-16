@@ -121,11 +121,6 @@ pub fn init_blinder_poly<C: CurveGroup>(
 // The function caller must provide the polynomial(s)'s evaluation tables,
 // and the function that combines the evaluation tables (i.e. combines the evaluations of polynomials).
 
-// Transcript behavior:
-// 1. Append the sum and the commitment to the blinder polynomial.
-// 2. Gets a challenge to combine the blinder polynomial with the summed polynomial(s).
-// 3. Gets challenges for each round of the sumcheck protocol.
-
 pub fn prove_sum<C: CurveGroup>(
     poly_num_vars: usize,
     poly_degree: usize,

@@ -6,6 +6,8 @@ use wasm_bindgen::prelude::*;
 #[cfg(target_arch = "wasm32")]
 use web_sys;
 
+// Struct returned by `timer_start` and passed to `timer_end`
+// when compiled to `wasm32`
 pub struct WebTimerInfo {
     start_time: f64,
     label: &'static str,
@@ -17,6 +19,7 @@ extern "C" {
     fn now() -> f64;
 }
 
+// Enum returned by `timer_start` and passed to `timer_end`
 pub enum TimerInfo {
     #[allow(dead_code)]
     Web(WebTimerInfo),
@@ -24,6 +27,7 @@ pub enum TimerInfo {
     Cmd(ArkTimerInfo),
 }
 
+// Start a timer.
 #[allow(dead_code)]
 pub fn timer_start(label: &'static str) -> TimerInfo {
     #[cfg(target_arch = "wasm32")]
@@ -40,13 +44,16 @@ pub fn timer_start(label: &'static str) -> TimerInfo {
     }
 }
 
+// End a timer and print the time elapsed.
 #[allow(dead_code)]
 pub fn timer_end(timer: TimerInfo) {
     match timer {
         TimerInfo::Web(t) => {
             let end = now();
+            // Compute the time elapsed in milliseconds
             let duration = end - t.start_time as f64;
             web_sys::console::log_1(&JsValue::from(format!("{}: {}ms", t.label, duration)));
+            // We don't use console::log_time because it doesn't work on mobile.
         }
         TimerInfo::Cmd(t) => {
             end_timer!(t);

@@ -100,7 +100,6 @@ impl<C: CurveGroup> Spartan<C> {
 
         // We implement the zero-knowledge sumcheck protocol
         // described in Section 4.1 https://eprint.iacr.org/2019/317.pdf.
-        // We use this blinder polynomial for both the first and second sumcheck.
         let init_blinder_poly_timer = profiler_start("Init blinder poly");
         let (sc1_blinder_poly, sc1_blinder_poly_comm) =
             init_blinder_poly(m, 3, &self.hyrax, transcript);

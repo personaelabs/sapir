@@ -35,6 +35,16 @@ macro_rules! circuit {
         static CONSTRAINT_SYSTEM: Mutex<ConstraintSystem<ScalarField<$curve>>> =
             Mutex::new(ConstraintSystem::new());
 
+        // ################################
+        // Expose the following functions to the wasm runtime
+        // ################################
+
+        #[wasm_bindgen]
+        pub fn init_panic_hook() {
+            console_error_panic_hook::set_once();
+        }
+
+        #[wasm_bindgen]
         pub fn prepare() {
             // ################################
             // Load the circuit
@@ -50,29 +60,35 @@ macro_rules! circuit {
             {
                 web_sys::console::log_1(&JsValue::from_str("Num constraints:"));
                 web_sys::console::log_1(&JsValue::from_f64(cs.num_constraints.unwrap() as f64));
-            }
+            };
         }
 
-        pub fn prove(
-            pub_input: &[ScalarField<$curve>],
-            priv_input: &[ScalarField<$curve>],
-        ) -> SpartanProof<$curve> {
+        #[wasm_bindgen]
+        pub fn prove(pub_input: &[u8], priv_input: &[u8]) -> Vec<u8> {
+            let pub_input = to_felts(pub_input);
+            let priv_input = to_felts(priv_input);
+
             let circuit = CIRCUIT.lock().unwrap().clone();
 
             let mut cs = CONSTRAINT_SYSTEM.lock().unwrap();
-            let witness = cs.gen_witness($synthesizer, pub_input, priv_input);
+            let witness = cs.gen_witness($synthesizer, &pub_input, &priv_input);
 
             assert!(cs.is_sat(&witness, &pub_input));
 
             // Generate the proof
-            let spartan = Spartan::new(circuit.z_len());
+            let spartan = Spartan::<$curve>::new(circuit.z_len());
             let mut transcript = Transcript::new($label);
 
-            let proof = spartan.prove(&circuit, &witness, pub_input, &mut transcript);
-            proof.0
+            let proof = spartan.prove(&circuit, &witness, &pub_input, &mut transcript);
+
+            let mut compressed_bytes = Vec::new();
+            proof.0.serialize_compressed(&mut compressed_bytes).unwrap();
+            compressed_bytes
         }
 
-        pub fn verify(proof: SpartanProof<$curve>) -> bool {
+        #[wasm_bindgen]
+        pub fn verify(proof_ser: &[u8]) -> bool {
+            let proof = SpartanProof::<$curve>::deserialize_compressed(proof_ser).unwrap();
             let circuit = CIRCUIT.lock().unwrap().clone();
 
             let spartan = Spartan::new(circuit.z_len());
@@ -82,55 +98,9 @@ macro_rules! circuit {
             true
         }
 
-        // ################################
-        // Expose the following functions to the wasm runtime
-        // ################################
-
-        #[wasm_bindgen]
-        pub fn init_panic_hook() {
-            console_error_panic_hook::set_once();
-        }
-
-        // Return the byte representation of the circuit
-        #[wasm_bindgen]
-        pub fn circuit() -> Vec<u8> {
-            let circuit = CIRCUIT.lock();
-
-            if circuit.is_err() {
-                panic!("Circuit not initialized");
-            }
-
-            let circuit = circuit.unwrap().clone();
-            let mut circuit_bytes = Vec::new();
-            circuit.serialize_compressed(&mut circuit_bytes).unwrap();
-            circuit_bytes
-        }
-
-        #[wasm_bindgen]
-        pub fn client_prepare() {
-            prepare();
-        }
-
-        #[wasm_bindgen]
-        pub fn client_prove(pub_input: &[u8], priv_input: &[u8]) -> Vec<u8> {
-            let pub_input_felts = to_felts(pub_input);
-            let priv_input_felts = to_felts(priv_input);
-
-            let proof = prove(&pub_input_felts, &priv_input_felts);
-            let mut compressed_bytes = Vec::new();
-            proof.serialize_compressed(&mut compressed_bytes).unwrap();
-            compressed_bytes
-        }
-
-        #[wasm_bindgen]
-        pub fn client_verify(proof_ser: &[u8]) -> bool {
-            let proof = SpartanProof::<$curve>::deserialize_compressed(proof_ser).unwrap();
-            verify(proof)
-        }
-
         /*
         #[wasm_bindgen]
-        pub fn client_generate_tx_input(proof_ser: &[u8], contract_address: &[u8]) -> Vec<u8> {
+        pub fn generate_tx_input(proof_ser: &[u8], contract_address: &[u8]) -> Vec<u8> {
             let proof = SpartanProof::<$curve>::deserialize_compressed(proof_ser).unwrap();
 
             let circuit = CIRCUIT.lock().unwrap().clone();
@@ -168,7 +138,7 @@ mod tests {
     }
 
     const NUM_CONS: usize = 2usize.pow(4);
-    circuit!(mock_circuit(NUM_CONS), Curve, b"test_client_prove");
+    circuit!(mock_circuit(NUM_CONS), Curve, b"test_prove");
 
     fn prove_and_verify(pub_input: &[F], priv_input: &[F]) {
         let pub_input_bytes = pub_input
@@ -184,16 +154,16 @@ mod tests {
             .collect::<Vec<u8>>();
 
         let prove_timer = timer_start("Proving time");
-        let proof_bytes = client_prove(&pub_input_bytes, &priv_input_bytes);
+        let proof_bytes = prove(&pub_input_bytes, &priv_input_bytes);
         timer_end(prove_timer);
 
         let verify_timer = timer_start("Verification time");
-        assert!(client_verify(&proof_bytes));
+        assert!(verify(&proof_bytes));
         timer_end(verify_timer);
     }
 
     #[test]
-    fn test_client_prove() {
+    fn test_prove() {
         let priv_input = [F::from(3), F::from(4)];
         let pub_input = [priv_input[0] * priv_input[1]];
 
