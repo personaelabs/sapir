@@ -21,7 +21,7 @@ ark-secq256k1 = "0.4.0"
 ark-secp256k1 = "0.4.0"
 hex = "0.4.3"
 num-bigint = "0.4.4"
-poseidon = { git = "https://github.com/DanTehrani/poseidon.git" }
+poseidon = { git = "https://github.com/personaelabs/poseidon.git" }
 merkle-tree = { git = "https://github.com/personaelabs/merkle-tree.git" }
 merlin = "3.0.0"
 
