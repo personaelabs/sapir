@@ -1,6 +1,5 @@
 pub mod prelude {
     // Re-export the dependencies that are used in the wasm module
-    // pub use crate::evm_verifier::generate_submit_proof_input;
     pub use crate::frontend::constraint_system::{CircuitMeta, ConstraintSystem};
     pub use crate::r1cs::R1CS;
     pub use crate::spartan::hyrax::Hyrax;

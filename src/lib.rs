@@ -1,6 +1,4 @@
 #![allow(non_snake_case)]
-#[cfg(feature = "evm-verifier")]
-pub mod evm_verifier;
 pub mod frontend;
 pub mod r1cs;
 pub mod spartan;
