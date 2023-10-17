@@ -75,7 +75,7 @@ pub fn test_satisfiability<F: PrimeField>(
 
     let mut witness = cs.gen_witness(&synthesizer, &pub_inputs, &priv_inputs);
 
-    // assert!(cs.is_sat(&witness, &pub_inputs));
+    assert!(cs.is_sat(&witness, &pub_inputs));
 
     // Should assert when the witness is invalid
     for i in 0..cs.num_vars() {
