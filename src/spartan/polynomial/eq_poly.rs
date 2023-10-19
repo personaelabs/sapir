@@ -4,11 +4,16 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 #[derive(CanonicalSerialize, CanonicalDeserialize)]
 pub struct EqPoly<F: PrimeField> {
     t: Vec<F>,
+    one_minus_t: Vec<F>,
 }
 
 impl<F: PrimeField> EqPoly<F> {
     pub fn new(t: Vec<F>) -> Self {
-        Self { t }
+        let mut one_minus_t = vec![];
+        for t_i in &t {
+            one_minus_t.push(F::ONE - t_i);
+        }
+        Self { t, one_minus_t }
     }
 
     // `x` should be in big-endian when treated as bits
@@ -22,21 +27,70 @@ impl<F: PrimeField> EqPoly<F> {
         result
     }
 
-    // Evaluate the polynomial at `x` as bits
-    pub fn eval_as_bits(&self, x: u64) -> F {
+    pub fn eval_as_bits_inters(&self, x: u64) -> (F, Vec<F>) {
         let mut result = F::ONE;
-        let one = F::ONE;
 
         let m = self.t.len();
-        for i in 0..m {
+        let mut inters = vec![];
+        for i in (0..m).rev() {
             let bit = (x >> i) & 1;
             result *= if bit == 1 {
                 self.t[m - i - 1]
             } else {
-                one - self.t[m - i - 1]
+                self.one_minus_t[m - i - 1]
+            };
+            inters.push(result);
+        }
+
+        (result, inters)
+    }
+
+    pub fn eval_as_bits(&self, x: u64) -> F {
+        let mut result = F::ONE;
+
+        let m = self.t.len();
+        for i in (0..m).rev() {
+            let bit = (x >> i) & 1;
+            result *= if bit == 1 {
+                self.t[m - i - 1]
+            } else {
+                self.one_minus_t[m - i - 1]
             };
         }
 
+        result
+    }
+
+    // Evaluate the polynomial at `x` as bits
+    pub fn eval_as_bits_with_inters(&self, x: u64, x_prev: u64, inters: &mut Vec<F>) -> F {
+        let m = self.t.len();
+        let mut dup_bits = 0;
+        for i in (0..m).rev() {
+            let x_i = (x >> i) & 1;
+            let x_prev_i = (x_prev >> i) & 1;
+            if x_i == x_prev_i {
+                dup_bits += 1;
+            } else {
+                break;
+            }
+        }
+
+        // We can use the previous result up until `dup_bits`
+        let mut result = if dup_bits == 0 {
+            F::ONE
+        } else {
+            inters[dup_bits - 1]
+        };
+
+        for i in (0..(m - dup_bits)).rev() {
+            let bit = (x >> i) & 1;
+            result *= if bit == 1 {
+                self.t[m - i - 1]
+            } else {
+                self.one_minus_t[m - i - 1]
+            };
+            inters[m - i - 1] = result;
+        }
         result
     }
 
@@ -91,5 +145,23 @@ mod tests {
             evals[evals.len() - 1],
             "The last evaluation is not correct"
         );
+    }
+
+    #[test]
+    fn test_eval_as_bits() {
+        let m = 7;
+        let t = (0..m).map(|i| F::from((i + 33) as u64)).collect::<Vec<_>>();
+        let eq_poly = EqPoly::<F>::new(t);
+
+        let xs = [1, 2, 3, 9, 10, 0, 13, 126];
+
+        let (_, mut inters) = eq_poly.eval_as_bits_inters(xs[0]);
+        let mut x_prev = xs[0];
+        for x in xs.iter().skip(1) {
+            let eval = eq_poly.eval_as_bits_with_inters(*x, x_prev, &mut inters);
+
+            assert_eq!(eval, eq_poly.eval_as_bits(*x));
+            x_prev = *x;
+        }
     }
 }

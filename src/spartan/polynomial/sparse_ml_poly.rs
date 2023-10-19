@@ -1,7 +1,5 @@
 use super::eq_poly::EqPoly;
 use ark_ff::PrimeField;
-#[cfg(feature = "parallel")]
-use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 
 #[derive(Clone, Debug)]
 pub struct SparseMLPoly<F> {
@@ -39,19 +37,17 @@ impl<F: PrimeField> SparseMLPoly<F> {
 
         let eq_poly = EqPoly::new(t.to_vec());
 
-        #[cfg(feature = "parallel")]
-        let result = self
-            .evals
-            .par_iter()
-            .map(|eval| eq_poly.eval_as_bits(eval.0) * eval.1)
-            .sum();
+        let (eval_first, mut inters) = eq_poly.eval_as_bits_inters(self.evals[0].0);
 
-        #[cfg(not(feature = "parallel"))]
-        let result = self
-            .evals
-            .iter()
-            .map(|eval| eq_poly.eval_as_bits(eval.0) * eval.1)
-            .sum();
+        let mut x_prev = self.evals[0].0;
+        let mut result = eval_first * self.evals[0].1;
+
+        for term in self.evals.iter().skip(1) {
+            let x = term.0;
+            let eval = eq_poly.eval_as_bits_with_inters(x, x_prev, &mut inters);
+            result += eval * term.1;
+            x_prev = x;
+        }
 
         result
     }
