@@ -67,12 +67,7 @@ impl<C: CurveGroup> SumCheckPhase2<C> {
             C_evals[entry.col] += evals_rx[entry.row] * entry.val;
         }
 
-        let mut eval_tables = vec![
-            A_evals.clone(),
-            B_evals.clone(),
-            C_evals.clone(),
-            self.Z_evals.clone(),
-        ];
+        let mut eval_tables = vec![A_evals, B_evals, C_evals, self.Z_evals.clone()];
 
         let poly_degree = 2;
         let comb_func = |x: &[ScalarField<C>]| (x[0] * r_A + x[1] * r_B + x[2] * r_C) * x[3];

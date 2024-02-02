@@ -16,6 +16,5 @@ pub use frontend::test_utils::*;
 // Re-export
 pub use ark_ec;
 pub use ark_ff;
-pub use ark_secq256k1;
 pub use merkle_tree;
 pub use poseidon;

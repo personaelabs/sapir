@@ -71,10 +71,9 @@ impl<C: CurveGroup> Spartan<C> {
 
         // Construct the `Z` vector from the witness and input
         let Z = R1CS::construct_z(r1cs_witness, r1cs_input);
-
         // Commit the witness polynomial
         let comm_witness_timer = profiler_start("Commit witness");
-        let committed_witness = self.hyrax.commit(padded_r1cs_witness.clone());
+        let committed_witness = self.hyrax.commit(padded_r1cs_witness);
         profiler_end(comm_witness_timer);
 
         // Add the witness commitment to the transcript
@@ -107,7 +106,7 @@ impl<C: CurveGroup> Spartan<C> {
 
         let sc_phase_1_timer = profiler_start("Sumcheck phase 1");
 
-        let sc_phase_1 = SumCheckPhase1::new(Az.clone(), Bz.clone(), Cz.clone());
+        let sc_phase_1 = SumCheckPhase1::new(Az, Bz, Cz);
         let (sc_proof_1, (v_A, v_B, v_C), rx) = sc_phase_1.prove(
             m,
             &self.hyrax,
@@ -298,7 +297,6 @@ mod tests {
         frontend::test_utils::mock_circuit,
         timer::{timer_end, timer_start},
     };
-    use std::panic;
 
     type Curve = ark_secq256k1::Projective;
     type F = ark_secq256k1::Fr;
