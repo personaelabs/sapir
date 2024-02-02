@@ -7,7 +7,7 @@ Sapir is an opinionated Rust library for generating client-side zero-knowledge p
 - Spartan prover.
 - R1CS
     - Set of APIs to write R1CS in Rust.
-    - Common operations in [gadgets/](https://www.notion.so/src/frontend/gadgets).
+    - Common operations in [gadgets/](/src/frontend/gadgets).
 - Client-side constraints generation
     - This alleviates the need to download a larger circuit file over the internet.
 - Helper macros to compile circuit/prover into wasm.
