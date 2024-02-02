@@ -1084,7 +1084,7 @@ impl<F: Field> ConstraintSystem<F> {
         }
     }
 
-    pub fn is_sat(&mut self, witness: &[F], public_input: &[F]) -> bool {
+    pub fn is_sat(&self, witness: &[F], public_input: &[F]) -> bool {
         let z = R1CS::construct_z(witness, public_input);
 
         if !self.constrained {
@@ -1145,6 +1145,14 @@ impl<F: Field> ConstraintSystem<F> {
 
         true
     }
+}
+
+pub fn init_circuit<F: Field>(
+    synthesizer: impl Fn(&mut ConstraintSystem<F>),
+) -> ConstraintSystem<F> {
+    let mut cs = ConstraintSystem::new();
+    cs.set_constraints(&synthesizer);
+    cs
 }
 
 #[macro_export]

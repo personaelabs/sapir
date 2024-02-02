@@ -29,7 +29,7 @@ pub mod prelude {
 use prelude::*;
 
 #[macro_export]
-macro_rules! circuit {
+macro_rules! embed_to_wasm {
     ($synthesizer:expr, $curve:ty, $label:expr) => {
         static CIRCUIT: Mutex<R1CS<ScalarField<$curve>>> = Mutex::new(R1CS::empty());
 
@@ -77,10 +77,9 @@ macro_rules! circuit {
             assert!(cs.is_sat(&witness, &pub_input));
 
             // Generate the proof
-            let spartan = Spartan::<$curve>::new(circuit.z_len());
-            let mut transcript = Transcript::new($label);
+            let spartan = Spartan::<$curve>::new($label, circuit);
 
-            let proof = spartan.prove(&circuit, &witness, &pub_input, &mut transcript);
+            let proof = spartan.prove(&witness, &pub_input);
 
             let mut compressed_bytes = Vec::new();
             proof.0.serialize_compressed(&mut compressed_bytes).unwrap();
@@ -92,9 +91,8 @@ macro_rules! circuit {
             let proof = SpartanProof::<$curve>::deserialize_compressed(proof_ser).unwrap();
             let circuit = CIRCUIT.lock().unwrap().clone();
 
-            let spartan = Spartan::new(circuit.z_len());
-            let mut transcript = Transcript::new($label);
-            spartan.verify(&circuit, &proof, &mut transcript, false);
+            let spartan = Spartan::new($label, circuit);
+            spartan.verify(&proof, false);
 
             true
         }
@@ -139,7 +137,7 @@ mod tests {
     }
 
     const NUM_CONS: usize = 2usize.pow(4);
-    circuit!(mock_circuit(NUM_CONS), Curve, b"test_prove");
+    embed_to_wasm!(mock_circuit(NUM_CONS), Curve, b"test_prove");
 
     fn prove_and_verify(pub_input: &[F], priv_input: &[F]) {
         let pub_input_bytes = pub_input
