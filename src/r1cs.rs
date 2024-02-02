@@ -1,22 +1,22 @@
 use crate::spartan::polynomial::sparse_ml_poly::SparseMLPoly;
-use ark_ff::PrimeField;
+use ark_ff::Field;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 
 #[derive(Clone, Debug, CanonicalSerialize, CanonicalDeserialize)]
-pub struct SparseMatrixEntry<F: PrimeField> {
+pub struct SparseMatrixEntry<F: Field> {
     pub row: usize,
     pub col: usize,
     pub val: F,
 }
 
 #[derive(Clone, CanonicalSerialize, CanonicalDeserialize)]
-pub struct Matrix<F: PrimeField> {
+pub struct Matrix<F: Field> {
     pub entries: Vec<SparseMatrixEntry<F>>,
     pub num_cols: usize,
     pub num_rows: usize,
 }
 
-impl<F: PrimeField> Matrix<F> {
+impl<F: Field> Matrix<F> {
     pub const fn empty() -> Self {
         Self {
             entries: vec![],
@@ -67,7 +67,7 @@ impl<F: PrimeField> Matrix<F> {
 }
 
 #[derive(Clone, CanonicalSerialize, CanonicalDeserialize)]
-pub struct R1CS<F: PrimeField> {
+pub struct R1CS<F: Field> {
     pub A: Matrix<F>,
     pub B: Matrix<F>,
     pub C: Matrix<F>,
@@ -75,7 +75,7 @@ pub struct R1CS<F: PrimeField> {
     pub num_input: usize,
 }
 
-impl<F: PrimeField> R1CS<F> {
+impl<F: Field> R1CS<F> {
     pub const fn empty() -> Self {
         Self {
             A: Matrix::empty(),
@@ -247,7 +247,7 @@ mod tests {
     use crate::spartan::polynomial::ml_poly::MlPoly;
 
     // Returns a vector of vectors of length m, where each vector is a boolean vector (big endian)
-    fn boolean_hypercube<F: PrimeField>(m: usize) -> Vec<Vec<F>> {
+    fn boolean_hypercube<F: Field>(m: usize) -> Vec<Vec<F>> {
         let n = 2usize.pow(m as u32);
 
         let mut boolean_hypercube = Vec::<Vec<F>>::with_capacity(n);

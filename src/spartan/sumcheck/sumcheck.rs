@@ -6,16 +6,16 @@ use crate::spartan::transcript::Transcript;
 use crate::timer::{profiler_end, profiler_start};
 use crate::ScalarField;
 use ark_ec::CurveGroup;
-use ark_ff::{Field, PrimeField, UniformRand};
+use ark_ff::{Field, UniformRand};
 
 #[derive(Clone)]
-pub struct BlinderPoly<F: PrimeField> {
+pub struct BlinderPoly<F: Field> {
     pub uni_polys: Vec<UniPoly<F>>,
     pub evals: Vec<F>, // Evaluation over the boolean hypercube
     pub sum: F,
 }
 
-impl<F: PrimeField> BlinderPoly<F> {
+impl<F: Field> BlinderPoly<F> {
     pub fn new(coeffs: Vec<Vec<F>>) -> Self {
         let num_vars = coeffs.len();
         let uni_polys = coeffs

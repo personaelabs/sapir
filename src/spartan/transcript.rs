@@ -1,6 +1,7 @@
 use crate::ScalarField;
 use ark_ec::CurveGroup;
-use ark_ff::{BigInteger, Field, PrimeField};
+use ark_ff::PrimeField;
+use ark_ff::{BigInteger, Field};
 use std::marker::PhantomData;
 
 #[derive(Clone)]

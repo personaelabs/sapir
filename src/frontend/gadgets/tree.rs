@@ -1,12 +1,12 @@
 use crate::frontend::constraint_system::{ConstraintSystem, Wire};
-use ark_ff::PrimeField;
+use ark_ff::Field;
 
 use super::poseidon::poseidon::PoseidonChip;
 
 const ARTY: usize = 2;
 const SPONGE_WIDTH: usize = ARTY + 1; // The sponge capacity is one, so the width is arity + 1
 
-fn hash<F: PrimeField>(
+fn hash<F: Field>(
     left: Wire<F>,
     right: Wire<F>,
     poseidon: PoseidonChip<F, SPONGE_WIDTH>,
@@ -21,7 +21,7 @@ fn hash<F: PrimeField>(
     poseidon.state[1]
 }
 
-pub fn verify_merkle_proof<F: PrimeField>(
+pub fn verify_merkle_proof<F: Field>(
     leaf: Wire<F>,
     siblings: &[Wire<F>],
     path_indices: &[Wire<F>],

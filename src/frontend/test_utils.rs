@@ -1,8 +1,8 @@
 use crate::frontend::constraint_system::ConstraintSystem;
-use ark_ff::PrimeField;
+use ark_ff::Field;
 
 #[allow(unused_must_use)]
-pub fn mock_circuit<F: PrimeField>(num_cons: usize) -> impl Fn(&mut ConstraintSystem<F>) {
+pub fn mock_circuit<F: Field>(num_cons: usize) -> impl Fn(&mut ConstraintSystem<F>) {
     let synthesizer = move |cs: &mut ConstraintSystem<F>| {
         let a = cs.alloc_priv_input();
         let b = cs.alloc_priv_input();
@@ -22,8 +22,8 @@ pub fn mock_circuit<F: PrimeField>(num_cons: usize) -> impl Fn(&mut ConstraintSy
 
 #[allow(unused_must_use)]
 #[allow(dead_code)]
-pub fn synthetic_circuit<F: PrimeField>(
-) -> (impl Fn(&mut ConstraintSystem<F>), Vec<F>, Vec<F>, Vec<F>) {
+pub fn synthetic_circuit<F: Field>() -> (impl Fn(&mut ConstraintSystem<F>), Vec<F>, Vec<F>, Vec<F>)
+{
     let synthesizer = |cs: &mut ConstraintSystem<F>| {
         let w1 = cs.alloc_pub_input();
         let w2 = cs.alloc_pub_input();
@@ -65,7 +65,7 @@ pub fn synthetic_circuit<F: PrimeField>(
 
 // 1. Test that the circuit is satisfiable when thew witness and the public input are valid
 // 2. Test that the circuit unsatisfiable when the witness or the public input is invalid.
-pub fn test_satisfiability<F: PrimeField>(
+pub fn test_satisfiability<F: Field>(
     synthesizer: impl Fn(&mut ConstraintSystem<F>),
     pub_inputs: &[F],
     priv_inputs: &[F],
@@ -96,7 +96,7 @@ pub fn test_satisfiability<F: PrimeField>(
 // 2. Test that the circuit unsatisfiable when the public input is invalid.
 // We need this separate from `test_satisfiability` because some circuits are satisfiable even when the witness is
 // randomly modified.
-pub fn test_var_pub_input<F: PrimeField>(
+pub fn test_var_pub_input<F: Field>(
     synthesizer: impl Fn(&mut ConstraintSystem<F>),
     pub_inputs: &[F],
     priv_inputs: &[F],

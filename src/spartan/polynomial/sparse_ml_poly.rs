@@ -1,5 +1,5 @@
 use super::eq_poly::EqPoly;
-use ark_ff::PrimeField;
+use ark_ff::Field;
 
 #[derive(Clone, Debug)]
 pub struct SparseMLPoly<F> {
@@ -7,7 +7,7 @@ pub struct SparseMLPoly<F> {
     pub num_vars: usize,
 }
 
-impl<F: PrimeField> SparseMLPoly<F> {
+impl<F: Field> SparseMLPoly<F> {
     pub fn new(evals: Vec<(u64, F)>, num_vars: usize) -> Self {
         Self { evals, num_vars }
     }

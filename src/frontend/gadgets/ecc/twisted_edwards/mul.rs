@@ -1,26 +1,25 @@
-use super::{add::ec_add_complete, double::ec_double};
-
-use super::AffinePoint;
-use crate::frontend::constraint_system::{ConstraintSystem, Wire};
-use ark_ff::PrimeField;
+use super::add::ec_add_complete;
+use super::TEAffinePoint;
+use crate::constraint_system::{ConstraintSystem, Wire};
+use ark_ec::{twisted_edwards::TECurveConfig, AffineRepr};
 
 // Naive double-and-add algorithm
-pub fn ec_mul<F: PrimeField>(
-    p: AffinePoint<F>,
-    s_bits: &[Wire<F>],
-    cs: &mut ConstraintSystem<F>,
-) -> AffinePoint<F> {
-    let infinity = AffinePoint::new(cs.zero(), cs.zero());
+pub fn ec_mul<C: TECurveConfig + Clone, A: AffineRepr<Config = C>>(
+    p: TEAffinePoint<C, A>,
+    s_bits: &[Wire<C::BaseField>],
+    cs: &mut ConstraintSystem<C::BaseField>,
+) -> TEAffinePoint<C, A> {
+    let infinity = TEAffinePoint::new(cs.zero(), cs.one());
     let mut result = infinity;
     let mut current = p;
 
     for s_i in s_bits {
         let t_x = *s_i * current.x;
-        let t_y = *s_i * current.y;
-        let t = AffinePoint::new(t_x, t_y);
+        let t_y = *s_i * current.y + (cs.one() - *s_i);
+        let t = TEAffinePoint::new(t_x, t_y);
 
-        result = ec_add_complete(t, result, cs);
-        current = ec_double(current, cs);
+        result = ec_add_complete::<C, A>(t, result);
+        current = ec_add_complete::<C, A>(current.clone(), current);
     }
 
     result
@@ -32,22 +31,22 @@ mod tests {
 
     use super::*;
     use ark_ec::{AffineRepr, CurveGroup};
+    use ark_ed25519::Fr;
+    use ark_ed25519::{EdwardsAffine, EdwardsConfig};
     use ark_ff::BigInteger;
     use ark_ff::PrimeField;
-    use ark_secp256k1::Affine as Secp256k1Affine;
-    use ark_secp256k1::Fr;
 
-    type Fp = ark_secp256k1::Fq;
+    type Fp = ark_ed25519::Fq;
 
     #[test]
-    pub fn test_ec_mul() {
+    pub fn test_twisted_ec_mul() {
         let synthesizer = |cs: &mut ConstraintSystem<Fp>| {
             let p_x = cs.alloc_priv_input();
             let p_y = cs.alloc_priv_input();
 
             let s_bits = cs.alloc_priv_inputs(256);
 
-            let p = AffinePoint::<Fp>::new(p_x, p_y);
+            let p = TEAffinePoint::<EdwardsConfig, EdwardsAffine>::new(p_x, p_y);
 
             let out = ec_mul(p, &s_bits, cs);
 
@@ -55,7 +54,7 @@ mod tests {
             cs.expose_public(out.y);
         };
 
-        let p = Secp256k1Affine::generator();
+        let p = EdwardsAffine::generator();
         let s = Fr::from(3u32);
 
         let s_bits = s
@@ -66,7 +65,6 @@ mod tests {
             .collect::<Vec<Fp>>();
 
         let out = (p * s).into_affine();
-
         let pub_input = vec![out.x, out.y];
         let mut priv_input = vec![p.x, p.y];
         priv_input.extend_from_slice(&s_bits);

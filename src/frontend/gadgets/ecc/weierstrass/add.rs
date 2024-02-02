@@ -1,11 +1,12 @@
-use super::AffinePoint;
+use super::super::AffinePoint;
 use crate::frontend::constraint_system::ConstraintSystem;
-use ark_ff::PrimeField;
+use ark_ec::AffineRepr;
+use ark_ff::Field;
 
 // Incomplete addition for short-Weierstrass curves.
 // We follow the specification from the halo2 book;
 // https://zcash.github.io/halo2/design/gadgets/sinsemilla.html?highlight=incomplete#incomplete-addition
-pub fn ec_add_incomplete<F: PrimeField>(p: AffinePoint<F>, q: AffinePoint<F>) -> AffinePoint<F> {
+pub fn ec_add_incomplete<C: AffineRepr>(p: AffinePoint<C>, q: AffinePoint<C>) -> AffinePoint<C> {
     let cs = p.x.cs();
 
     let dx = p.x - q.x;
@@ -15,15 +16,15 @@ pub fn ec_add_incomplete<F: PrimeField>(p: AffinePoint<F>, q: AffinePoint<F>) ->
 
     // out_x = (lambda * lambda) - p.x - q.x;
     let out_x = cs.constrain(
-        &[(lambda, F::ONE)],
-        &[(lambda, F::ONE)],
-        &[(p.x, -F::ONE), (q.x, -F::ONE)],
+        &[(lambda, C::BaseField::ONE)],
+        &[(lambda, C::BaseField::ONE)],
+        &[(p.x, -C::BaseField::ONE), (q.x, -C::BaseField::ONE)],
     );
     // out_y = lambda * (p.x - out_x) - p.y;
     let out_y = cs.constrain(
-        &[(lambda, F::ONE)],
-        &[(p.x, F::ONE), (out_x, -F::ONE)],
-        &[(p.y, -F::ONE)],
+        &[(lambda, C::BaseField::ONE)],
+        &[(p.x, C::BaseField::ONE), (out_x, -C::BaseField::ONE)],
+        &[(p.y, -C::BaseField::ONE)],
     );
 
     AffinePoint::new(out_x, out_y)
@@ -32,11 +33,11 @@ pub fn ec_add_incomplete<F: PrimeField>(p: AffinePoint<F>, q: AffinePoint<F>) ->
 // Complete addition for short-Weierstrass curves.
 // We follow the specification from the halo2 book.
 // https://zcash.github.io/halo2/design/gadgets/ecc/addition.html#complete-addition
-pub fn ec_add_complete<F: PrimeField>(
-    p: AffinePoint<F>,
-    q: AffinePoint<F>,
-    cs: &mut ConstraintSystem<F>,
-) -> AffinePoint<F> {
+pub fn ec_add_complete<C: AffineRepr>(
+    p: AffinePoint<C>,
+    q: AffinePoint<C>,
+    cs: &mut ConstraintSystem<C::BaseField>,
+) -> AffinePoint<C> {
     let is_x_equal = p.x.is_equal(q.x);
 
     let p_is_zero = p.x.is_zero();
@@ -77,15 +78,15 @@ mod tests {
 
     type F = ark_secq256k1::Fr;
 
-    fn add_incomplete_circuit<F: PrimeField>(cs: &mut ConstraintSystem<F>) {
+    fn add_incomplete_circuit<C: AffineRepr>(cs: &mut ConstraintSystem<F>) {
         let p_x = cs.alloc_priv_input();
         let p_y = cs.alloc_priv_input();
 
         let q_x = cs.alloc_priv_input();
         let q_y = cs.alloc_priv_input();
 
-        let p = AffinePoint::<F>::new(p_x, p_y);
-        let q = AffinePoint::<F>::new(q_x, q_y);
+        let p = AffinePoint::<Secp256k1Affine>::new(p_x, p_y);
+        let q = AffinePoint::<Secp256k1Affine>::new(q_x, q_y);
 
         let out = ec_add_incomplete(p, q);
 
@@ -95,7 +96,8 @@ mod tests {
 
     #[test]
     pub fn test_add_incomplete() {
-        let synthesizer = |cs: &mut ConstraintSystem<F>| add_incomplete_circuit(cs);
+        let synthesizer =
+            |cs: &mut ConstraintSystem<F>| add_incomplete_circuit::<Secp256k1Affine>(cs);
 
         let p = Secp256k1Affine::generator();
         let q = (Secp256k1Affine::generator() * Fr::from(3)).into_affine();
@@ -108,15 +110,15 @@ mod tests {
         test_satisfiability(synthesizer, &pub_input, &priv_input);
     }
 
-    fn add_complete_circuit<F: PrimeField>(cs: &mut ConstraintSystem<F>) {
+    fn add_complete_circuit<C: AffineRepr>(cs: &mut ConstraintSystem<F>) {
         let p_x = cs.alloc_priv_input();
         let p_y = cs.alloc_priv_input();
 
         let q_x = cs.alloc_priv_input();
         let q_y = cs.alloc_priv_input();
 
-        let p = AffinePoint::<F>::new(p_x, p_y);
-        let q = AffinePoint::<F>::new(q_x, q_y);
+        let p = AffinePoint::<Secp256k1Affine>::new(p_x, p_y);
+        let q = AffinePoint::<Secp256k1Affine>::new(q_x, q_y);
 
         let out = ec_add_complete(p, q, cs);
 
@@ -126,7 +128,8 @@ mod tests {
 
     #[test]
     pub fn test_add_complete() {
-        let synthesizer = |cs: &mut ConstraintSystem<F>| add_complete_circuit(cs);
+        let synthesizer =
+            |cs: &mut ConstraintSystem<F>| add_complete_circuit::<Secp256k1Affine>(cs);
 
         let zero = Secp256k1Affine::identity();
 
@@ -143,6 +146,7 @@ mod tests {
 
         for (p, q) in cases {
             let out = (p + q).into_affine();
+
             let pub_input = vec![out.x, out.y];
             let priv_input = vec![p.x, p.y, q.x, q.y];
 

@@ -1,8 +1,9 @@
 use crate::frontend::constraint_system::Wire;
 use ark_ff::BigInteger;
+use ark_ff::Field;
 use ark_ff::PrimeField;
 
-pub fn xor_64<F: PrimeField>(a: [Wire<F>; 64], b: [Wire<F>; 64]) -> [Wire<F>; 64] {
+pub fn xor_64<F: Field>(a: [Wire<F>; 64], b: [Wire<F>; 64]) -> [Wire<F>; 64] {
     let cs = a[0].cs();
     assert_eq!(a.len(), b.len());
     let mut out = [cs.one(); 64];
@@ -14,7 +15,7 @@ pub fn xor_64<F: PrimeField>(a: [Wire<F>; 64], b: [Wire<F>; 64]) -> [Wire<F>; 64
 }
 
 // (!a) & b
-pub fn not_a_and_b<F: PrimeField>(a: Wire<F>, b: Wire<F>) -> Wire<F> {
+pub fn not_a_and_b<F: Field>(a: Wire<F>, b: Wire<F>) -> Wire<F> {
     let cs = a.cs();
 
     let one = cs.one();
@@ -22,7 +23,7 @@ pub fn not_a_and_b<F: PrimeField>(a: Wire<F>, b: Wire<F>) -> Wire<F> {
     cs.constrain(&[(a, -F::ONE), (one, F::ONE)], &[(b, F::ONE)], &[])
 }
 
-pub fn not_a_and_b_64<F: PrimeField>(a: [Wire<F>; 64], b: [Wire<F>; 64]) -> [Wire<F>; 64] {
+pub fn not_a_and_b_64<F: Field>(a: [Wire<F>; 64], b: [Wire<F>; 64]) -> [Wire<F>; 64] {
     let cs = a[0].cs();
     assert_eq!(a.len(), b.len());
     let mut out = [cs.one(); 64];
@@ -33,7 +34,7 @@ pub fn not_a_and_b_64<F: PrimeField>(a: [Wire<F>; 64], b: [Wire<F>; 64]) -> [Wir
     out
 }
 
-pub fn rotate_left_64<F: PrimeField>(a: [Wire<F>; 64], n: usize) -> [Wire<F>; 64] {
+pub fn rotate_left_64<F: Field>(a: [Wire<F>; 64], n: usize) -> [Wire<F>; 64] {
     let mut out = Vec::with_capacity(64);
     for i in 0..64 {
         out.push(a[((i as usize).wrapping_sub(n)) % 64]);
@@ -42,7 +43,7 @@ pub fn rotate_left_64<F: PrimeField>(a: [Wire<F>; 64], n: usize) -> [Wire<F>; 64
     out.try_into().unwrap()
 }
 
-pub fn bit_xor<F: PrimeField>(a: Wire<F>, b: Wire<F>) -> Wire<F> {
+pub fn bit_xor<F: Field>(a: Wire<F>, b: Wire<F>) -> Wire<F> {
     let cs = a.cs();
 
     // -2a * b + a + b = c
@@ -54,7 +55,7 @@ pub fn bit_xor<F: PrimeField>(a: Wire<F>, b: Wire<F>) -> Wire<F> {
 }
 
 // Little-endian bits to value
-pub fn form_le_bits<F: PrimeField>(bits: &[Wire<F>]) -> Wire<F> {
+pub fn form_le_bits<F: Field>(bits: &[Wire<F>]) -> Wire<F> {
     let cs = bits[0].cs();
 
     let mut terms = Vec::with_capacity(bits.len());
@@ -95,7 +96,7 @@ pub fn to_le_bits<F: PrimeField>(x: Wire<F>) -> Vec<Wire<F>> {
 mod tests {
     use super::*;
     use crate::{frontend::constraint_system::ConstraintSystem, test_var_pub_input};
-    use ark_ff::{Field, PrimeField};
+    use ark_ff::Field;
 
     type Fp = ark_secq256k1::Fr;
 

@@ -1,10 +1,10 @@
 use core::panic;
 
-use ark_ff::PrimeField;
+use ark_ff::Field;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 
 #[derive(Clone, CanonicalSerialize, CanonicalDeserialize)]
-pub struct UniPoly<F: PrimeField> {
+pub struct UniPoly<F: Field> {
     pub coeffs: Vec<F>, // coefficients in ascending degree
     pub eval_at_0: F,
     pub eval_at_1: F,
@@ -12,7 +12,7 @@ pub struct UniPoly<F: PrimeField> {
     pub eval_at_3: F,
 }
 
-impl<F: PrimeField> UniPoly<F> {
+impl<F: Field> UniPoly<F> {
     pub fn new(coeffs: Vec<F>) -> Self {
         let eval_at_0 = coeffs[coeffs.len() - 1];
         let eval_at_1 = coeffs.iter().fold(F::ZERO, |acc, f| acc + f);

@@ -1,13 +1,13 @@
-use ark_ff::PrimeField;
+use ark_ff::Field;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 
 #[derive(CanonicalSerialize, CanonicalDeserialize)]
-pub struct EqPoly<F: PrimeField> {
+pub struct EqPoly<F: Field> {
     t: Vec<F>,
     one_minus_t: Vec<F>,
 }
 
-impl<F: PrimeField> EqPoly<F> {
+impl<F: Field> EqPoly<F> {
     pub fn new(t: Vec<F>) -> Self {
         let mut one_minus_t = vec![];
         for t_i in &t {

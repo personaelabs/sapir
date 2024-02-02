@@ -1,16 +1,16 @@
 use crate::frontend::constraint_system::{ConstraintSystem, Wire};
-use ark_ff::PrimeField;
+use ark_ff::Field;
 use poseidon::PoseidonConstants;
 
 #[derive(Clone)]
-pub struct PoseidonChip<F: PrimeField, const WIDTH: usize> {
+pub struct PoseidonChip<F: Field, const WIDTH: usize> {
     pub state: [Wire<F>; WIDTH],
     pub pos: usize,
     constants: PoseidonConstants<F>,
     cs: *mut ConstraintSystem<F>,
 }
 
-impl<F: PrimeField, const WIDTH: usize> PoseidonChip<F, WIDTH> {
+impl<F: Field, const WIDTH: usize> PoseidonChip<F, WIDTH> {
     pub fn new(cs_ptr: *mut ConstraintSystem<F>, constants: PoseidonConstants<F>) -> Self {
         let cs = unsafe { &mut *cs_ptr };
         let zero = cs.zero();

@@ -6,6 +6,7 @@ pub mod prelude {
     pub use crate::spartan::spartan::{Spartan, SpartanProof};
     pub use crate::spartan::transcript::Transcript;
     pub use crate::ScalarField;
+    pub use ark_ff::Field;
     pub use ark_ff::PrimeField;
     pub use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
     pub use console_error_panic_hook;

@@ -1,9 +1,9 @@
 use crate::ScalarField;
 use ark_ec::{CurveConfig, CurveGroup};
-use ark_ff::PrimeField;
+use ark_ff::Field;
 use ark_ff::Zero;
 
-pub fn inner_prod<F: PrimeField>(a: &[F], b: &[F]) -> F {
+pub fn inner_prod<F: Field>(a: &[F], b: &[F]) -> F {
     assert_eq!(a.len(), b.len());
     let mut result = F::ZERO;
     for i in 0..a.len() {

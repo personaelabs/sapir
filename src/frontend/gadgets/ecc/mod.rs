@@ -1,18 +1,17 @@
 use crate::frontend::constraint_system::Wire;
-use ark_ff::PrimeField;
+use ark_ec::AffineRepr;
 
-pub mod add;
-pub mod double;
-pub mod mul;
+pub mod twisted_edwards;
+pub mod weierstrass;
 
 #[derive(Copy, Clone)]
-pub struct AffinePoint<F: PrimeField> {
-    pub x: Wire<F>,
-    pub y: Wire<F>,
+pub struct AffinePoint<C: AffineRepr> {
+    pub x: Wire<C::BaseField>,
+    pub y: Wire<C::BaseField>,
 }
 
-impl<F: PrimeField> AffinePoint<F> {
-    pub fn new(x: Wire<F>, y: Wire<F>) -> Self {
+impl<C: AffineRepr> AffinePoint<C> {
+    pub fn new(x: Wire<C::BaseField>, y: Wire<C::BaseField>) -> Self {
         Self { x, y }
     }
 }

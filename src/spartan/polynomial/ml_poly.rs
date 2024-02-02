@@ -1,13 +1,13 @@
 use super::eq_poly::EqPoly;
-use ark_ff::PrimeField;
+use ark_ff::Field;
 
 #[derive(Clone, Debug)]
-pub struct MlPoly<F: PrimeField> {
+pub struct MlPoly<F: Field> {
     pub evals: Vec<F>,
     pub num_vars: usize,
 }
 
-impl<F: PrimeField> MlPoly<F> {
+impl<F: Field> MlPoly<F> {
     pub fn new(evals: Vec<F>) -> Self {
         assert!(evals.len().is_power_of_two());
         let num_vars = (evals.len() as f64).log2() as usize;
