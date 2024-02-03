@@ -19,7 +19,7 @@ Sapir is an opinionated Rust library for generating client-side zero-knowledge p
 
 ## Write your first circuit
 
-*This doc assumes that the reader is familiar with the concept of writing circuits. Prior experience with Circom, ZokRates, Halo2, etc is preferable.*
+*This doc assumes that the reader is familiar with the concept of writing circuits. Prior experience with Circom, ZoKrates, Halo2, etc is preferable.*
 
 ### 1. Create a new directory
 
@@ -50,7 +50,7 @@ fn my_synthesizer<F: Field>(cs: &mut ConstraintSystem<F>) {
 }
 ```
 
-Let's breakdown the above code.
+Let's break down the above code.
 
 A synthesizer should have the follwoing function signature.
 ```jsx
