@@ -35,11 +35,21 @@ cargo init --lib
 
 ```
 
-### 3. Write the synthesizer
+### 3. Add Sapir as a dependency
+```
+[dependencies]
+sapir = { git = "https://github.com/personaelabs/sapir" }
+```
+
+### 4. Write the synthesizer
 
 In Sapir, you write a _**synthesizer**_ to define the rules. The following is a synthesizer for a circuit that takes two private inputs and multiplies them.
 
+`lib.rs`
 ```rust
+use sapir::ark_ff::Field;
+use sapir::constraint_system::ConstraintSystem;
+
 fn my_synthesizer<F: Field>(cs: &mut ConstraintSystem<F>) {
     let a = cs.alloc_priv_input();
     let b = cs.alloc_priv_input();
@@ -48,6 +58,7 @@ fn my_synthesizer<F: Field>(cs: &mut ConstraintSystem<F>) {
 
     cs.expose_public(c);
 }
+
 ```
 
 Let's break down the above code.
@@ -72,7 +83,7 @@ Lastly, we expose `c` as a public input.
 ```jsx
 cs.expose_public(c);
 ```
-### 4. Generate the witness
+### 5. Generate the witness
 
 Now we can generate the witness of our circuit. We use the `Circuit` struct to do so. A Sapir circuit can be instantiated on any elliptic curve that is available in the [arkworks](https://github.com/arkworks-rs/algebra) ecosystem. For this example, we use the secq256k1 curve.
 
@@ -107,11 +118,11 @@ The above code defines a test that
 
 Run `cargo test` . If the test passes, you have successfully generated a satisfying witness!
 
-### 5. Generating a proof
+### 6. Generating a proof
 
 Now that we have our witness, we can generate a zero-knowledge proof.
 
-Paste the following code and run  `cargo test —tests test_prove`
+Paste the following code and run  `cargo test --tests test_prove`
 
 ```rust
 use sapir::spartan::spartan::Spartan;
@@ -134,7 +145,7 @@ fn test_prove() {
 }
 ```
 
-### 6. Compile the circuit and the prover to wasm
+### 7. Compile the circuit and the prover to wasm
 
 You can use [wasm-pack](https://rustwasm.github.io/wasm-pack/) to compile the circuit and the prover into wasm.
 Install wasm-pack with the following command,
@@ -155,7 +166,6 @@ Paste the following code and run `wasm-pack build`
 use sapir::embed_to_wasm;
 use sapir::wasm::prelude::*;
 
-type Curve = ark_secq256k1::Projective;
 const DOMAIN_STR: &[u8] = b"hello-sapir";
 
 embed_to_wasm!(my_synthesizer, Curve, DOMAIN_STR);
