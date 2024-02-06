@@ -1,18 +1,15 @@
 use super::super::AffinePoint;
 use crate::frontend::constraint_system::ConstraintSystem;
-use ark_ec::AffineRepr;
+use ark_ff::Field;
 
 // Doubling for short-Weierstrass curves
-pub fn ec_double<C: AffineRepr>(
-    p: AffinePoint<C>,
-    cs: &mut ConstraintSystem<C::BaseField>,
-) -> AffinePoint<C> {
+pub fn ec_double<F: Field>(p: AffinePoint<F>, cs: &mut ConstraintSystem<F>) -> AffinePoint<F> {
     // lambda = (3 * x^2) / (2 * y)
-    let lambda = (cs.alloc_const(C::BaseField::from(3u32)) * (p.x * p.x))
-        / (cs.alloc_const(C::BaseField::from(2u32)) * p.y);
+    let lambda =
+        (cs.alloc_const(F::from(3u32)) * (p.x * p.x)) / (cs.alloc_const(F::from(2u32)) * p.y);
 
     // x = lambda^2 - 2 * x
-    let out_x = (lambda * lambda) - (p.x * cs.alloc_const(C::BaseField::from(2u32)));
+    let out_x = (lambda * lambda) - (p.x * cs.alloc_const(F::from(2u32)));
     // y = lambda * (x - out_x) - y
     let out_y = lambda * (p.x - out_x) - p.y;
 
@@ -27,7 +24,7 @@ mod tests {
     use ark_secp256k1::Affine as Secp256k1Affine;
     use ark_secp256k1::Fr;
 
-    type F = ark_secq256k1::Fr;
+    type F = ark_secp256k1::Fq;
 
     #[test]
     fn test_ec_double() {
@@ -35,7 +32,7 @@ mod tests {
             let p_x = cs.alloc_priv_input();
             let p_y = cs.alloc_priv_input();
 
-            let p = AffinePoint::<Secp256k1Affine>::new(p_x, p_y);
+            let p = AffinePoint::<F>::new(p_x, p_y);
 
             let out = ec_double(p, cs);
 

@@ -1,7 +1,7 @@
 use super::bitops::form_le_bits;
 use crate::frontend::constraint_system::Wire;
 use crate::frontend::gadgets::bitops::{not_a_and_b_64, rotate_left_64, xor_64};
-use ark_ff::Field;
+use ark_ff::PrimeField;
 use std::ops::Add;
 
 // Keccak256 parameters in bits
@@ -48,7 +48,7 @@ pub const RC: [u64; ROUNDS] = [
     0x8000000080008008u64,
 ];
 
-pub fn to_addr<F: Field>(input: [Wire<F>; 512]) -> Wire<F> {
+pub fn to_addr<F: PrimeField>(input: [Wire<F>; 512]) -> Wire<F> {
     let cs = input[0].cs();
     let zero = cs.zero();
     let one = cs.one();
@@ -181,11 +181,11 @@ pub fn to_addr<F: Field>(input: [Wire<F>; 512]) -> Wire<F> {
 mod tests {
     use super::*;
     use crate::{frontend::constraint_system::ConstraintSystem, test_var_pub_input};
-    use ark_ff::Field;
+    use ark_ff::{Field, PrimeField};
     use num_bigint::BigUint;
     type F = ark_secq256k1::Fr;
 
-    fn to_addr_circuit<F: Field>(cs: &mut ConstraintSystem<F>) {
+    fn to_addr_circuit<F: PrimeField>(cs: &mut ConstraintSystem<F>) {
         let pub_key_bits = cs.alloc_priv_inputs(512);
 
         let addr = to_addr(pub_key_bits.try_into().unwrap());

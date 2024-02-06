@@ -1,12 +1,14 @@
-use super::TEAffinePoint;
-use ark_ec::{twisted_edwards::TECurveConfig, AffineRepr};
+use crate::frontend::gadgets::AffinePoint;
+use ark_ff::Field;
 
 // Complete addition for Twisted Edwards curves.
 // 6 Arithmetic on Twisted Edwards Curves,  https://eprint.iacr.org/2008/013.pdf
-pub fn ec_add_complete<C: TECurveConfig, A: AffineRepr<Config = C>>(
-    p: TEAffinePoint<C, A>,
-    q: TEAffinePoint<C, A>,
-) -> TEAffinePoint<C, A> {
+pub fn ec_add_complete<F: Field>(
+    p: AffinePoint<F>,
+    q: AffinePoint<F>,
+    d: F,
+    a: F,
+) -> AffinePoint<F> {
     let cs = p.x.cs();
 
     // Compute the x-coordinate
@@ -14,7 +16,7 @@ pub fn ec_add_complete<C: TECurveConfig, A: AffineRepr<Config = C>>(
     let y1y2 = p.y * q.y;
     let x1x2y1y2 = x1x2 * y1y2;
 
-    let dx1x2y1y2 = cs.mul_const(x1x2y1y2, C::COEFF_D);
+    let dx1x2y1y2 = cs.mul_const(x1x2y1y2, d);
 
     let x1y2 = p.x * q.y;
     let y1x2 = p.y * q.x;
@@ -26,10 +28,10 @@ pub fn ec_add_complete<C: TECurveConfig, A: AffineRepr<Config = C>>(
 
     // Compute the y-coordinate
     let denominator_y = cs.one() - dx1x2y1y2;
-    let numerator_y = y1y2 - cs.mul_const(x1x2, C::COEFF_A);
+    let numerator_y = y1y2 - cs.mul_const(x1x2, a);
     let out_y = numerator_y.div_or_zero(denominator_y);
 
-    TEAffinePoint::new(out_x, out_y)
+    AffinePoint::new(out_x, out_y)
 }
 
 #[cfg(test)]
@@ -37,6 +39,7 @@ mod tests {
     use super::*;
     use crate::frontend::constraint_system::ConstraintSystem;
     use crate::test_var_pub_input;
+    use ark_ec::twisted_edwards::{MontCurveConfig, TECurveConfig};
     use ark_ec::{AffineRepr, CurveGroup};
     use ark_ed25519::EdwardsAffine;
     use ark_ed25519::EdwardsConfig;
@@ -44,19 +47,17 @@ mod tests {
 
     type Fq = ark_ed25519::Fq;
 
-    fn add_complete_circuit<C: TECurveConfig, A: AffineRepr<Config = C>>(
-        cs: &mut ConstraintSystem<C::BaseField>,
-    ) {
+    fn add_complete_circuit<F: Field>(cs: &mut ConstraintSystem<F>, d: F, a: F) {
         let p_x = cs.alloc_priv_input();
         let p_y = cs.alloc_priv_input();
 
         let q_x = cs.alloc_priv_input();
         let q_y = cs.alloc_priv_input();
 
-        let p = TEAffinePoint::<C, A>::new(p_x, p_y);
-        let q = TEAffinePoint::<C, A>::new(q_x, q_y);
+        let p = AffinePoint::new(p_x, p_y);
+        let q = AffinePoint::new(q_x, q_y);
 
-        let out = ec_add_complete(p, q);
+        let out: AffinePoint<F> = ec_add_complete(p, q, d, a);
 
         cs.expose_public(out.x);
         cs.expose_public(out.x);
@@ -65,7 +66,11 @@ mod tests {
     #[test]
     pub fn test_twisted_add_complete() {
         let synthesizer = |cs: &mut ConstraintSystem<Fq>| {
-            add_complete_circuit::<EdwardsConfig, EdwardsAffine>(cs)
+            add_complete_circuit(
+                cs,
+                <EdwardsConfig as TECurveConfig>::COEFF_D,
+                <EdwardsConfig as TECurveConfig>::COEFF_A,
+            )
         };
 
         let zero = EdwardsAffine::zero();

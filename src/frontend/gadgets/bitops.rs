@@ -55,7 +55,7 @@ pub fn bit_xor<F: Field>(a: Wire<F>, b: Wire<F>) -> Wire<F> {
 }
 
 // Little-endian bits to value
-pub fn form_le_bits<F: Field>(bits: &[Wire<F>]) -> Wire<F> {
+pub fn form_le_bits<F: PrimeField>(bits: &[Wire<F>]) -> Wire<F> {
     let cs = bits[0].cs();
 
     let mut terms = Vec::with_capacity(bits.len());

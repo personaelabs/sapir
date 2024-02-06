@@ -1,25 +1,29 @@
 use super::add::ec_add_complete;
-use super::TEAffinePoint;
-use crate::constraint_system::{ConstraintSystem, Wire};
-use ark_ec::{twisted_edwards::TECurveConfig, AffineRepr};
+use crate::{
+    constraint_system::{ConstraintSystem, Wire},
+    frontend::gadgets::AffinePoint,
+};
+use ark_ff::Field;
 
 // Naive double-and-add algorithm
-pub fn ec_mul<C: TECurveConfig + Clone, A: AffineRepr<Config = C>>(
-    p: TEAffinePoint<C, A>,
-    s_bits: &[Wire<C::BaseField>],
-    cs: &mut ConstraintSystem<C::BaseField>,
-) -> TEAffinePoint<C, A> {
-    let infinity = TEAffinePoint::new(cs.zero(), cs.one());
+pub fn ec_mul<F: Field>(
+    p: AffinePoint<F>,
+    s_bits: &[Wire<F>],
+    d: F,
+    a: F,
+    cs: &mut ConstraintSystem<F>,
+) -> AffinePoint<F> {
+    let infinity = AffinePoint::new(cs.zero(), cs.one());
     let mut result = infinity;
     let mut current = p;
 
     for s_i in s_bits {
         let t_x = *s_i * current.x;
         let t_y = *s_i * current.y + (cs.one() - *s_i);
-        let t = TEAffinePoint::new(t_x, t_y);
+        let t = AffinePoint::new(t_x, t_y);
 
-        result = ec_add_complete::<C, A>(t, result);
-        current = ec_add_complete::<C, A>(current.clone(), current);
+        result = ec_add_complete(t, result, d, a);
+        current = ec_add_complete(current.clone(), current, d, a);
     }
 
     result
@@ -30,6 +34,7 @@ mod tests {
     use crate::test_var_pub_input;
 
     use super::*;
+    use ark_ec::twisted_edwards::TECurveConfig;
     use ark_ec::{AffineRepr, CurveGroup};
     use ark_ed25519::Fr;
     use ark_ed25519::{EdwardsAffine, EdwardsConfig};
@@ -46,9 +51,11 @@ mod tests {
 
             let s_bits = cs.alloc_priv_inputs(256);
 
-            let p = TEAffinePoint::<EdwardsConfig, EdwardsAffine>::new(p_x, p_y);
+            let p = AffinePoint::new(p_x, p_y);
+            let d = EdwardsConfig::COEFF_D;
+            let a = EdwardsConfig::COEFF_A;
 
-            let out = ec_mul(p, &s_bits, cs);
+            let out = ec_mul(p, &s_bits, d, a, cs);
 
             cs.expose_public(out.x);
             cs.expose_public(out.y);

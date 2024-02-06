@@ -1,14 +1,14 @@
 use super::super::AffinePoint;
 use super::{add::ec_add_complete, double::ec_double};
 use crate::frontend::constraint_system::{ConstraintSystem, Wire};
-use ark_ec::AffineRepr;
+use ark_ff::Field;
 
 // Naive double-and-add algorithm
-pub fn ec_mul<C: AffineRepr>(
-    p: AffinePoint<C>,
-    s_bits: &[Wire<C::BaseField>],
-    cs: &mut ConstraintSystem<C::BaseField>,
-) -> AffinePoint<C> {
+pub fn ec_mul<F: Field>(
+    p: AffinePoint<F>,
+    s_bits: &[Wire<F>],
+    cs: &mut ConstraintSystem<F>,
+) -> AffinePoint<F> {
     let infinity = AffinePoint::new(cs.zero(), cs.zero());
     let mut result = infinity;
     let mut current = p;
@@ -35,17 +35,18 @@ mod tests {
     use ark_ff::PrimeField;
     use ark_secp256k1::Affine as Secp256k1Affine;
     use ark_secp256k1::Fr;
-    type Fp = ark_secp256k1::Fq;
+
+    type F = ark_secp256k1::Fq;
 
     #[test]
     pub fn test_ec_mul() {
-        let synthesizer = |cs: &mut ConstraintSystem<Fp>| {
+        let synthesizer = |cs: &mut ConstraintSystem<F>| {
             let p_x = cs.alloc_priv_input();
             let p_y = cs.alloc_priv_input();
 
             let s_bits = cs.alloc_priv_inputs(256);
 
-            let p = AffinePoint::<Secp256k1Affine>::new(p_x, p_y);
+            let p = AffinePoint::new(p_x, p_y);
 
             let out = ec_mul(p, &s_bits, cs);
 
@@ -60,8 +61,8 @@ mod tests {
             .into_bigint()
             .to_bits_le()
             .iter()
-            .map(|b| Fp::from(*b))
-            .collect::<Vec<Fp>>();
+            .map(|b| F::from(*b))
+            .collect::<Vec<F>>();
 
         let out = (p * s).into_affine();
 
