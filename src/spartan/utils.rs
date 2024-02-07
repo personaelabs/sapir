@@ -12,20 +12,6 @@ pub fn inner_prod<F: Field>(a: &[F], b: &[F]) -> F {
     result
 }
 
-// Compute the terms (powers) that appear in an MSM
-pub fn msm_powers<C: CurveGroup>(
-    scalars: &[<C::Config as CurveConfig>::ScalarField],
-    points: &[C],
-) -> Vec<C> {
-    let mut powers = Vec::with_capacity(scalars.len());
-
-    for (scalar, p) in scalars.iter().zip(points.iter()) {
-        powers.push(*p * *scalar);
-    }
-
-    powers
-}
-
 // MSM with affine points. This is faster than the version with projective points if
 // the points are already affine.
 pub fn msm_affine<C: CurveGroup>(scalars: &[ScalarField<C>], points: &[C::Affine]) -> C {

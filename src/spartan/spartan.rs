@@ -1,6 +1,5 @@
 use super::{
-    hyrax::{PolyEvalProof, PolyEvalProofInters},
-    ipa::IPAInters,
+    hyrax::PolyEvalProof,
     polynomial::sparse_ml_poly::SparseMLPoly,
     sumcheck::{sumcheck::init_blinder_poly, SumCheckProof},
 };
@@ -28,13 +27,6 @@ pub struct SpartanProof<C: CurveGroup> {
     pub v_A: ScalarField<C>,
     pub v_B: ScalarField<C>,
     pub v_C: ScalarField<C>,
-}
-
-// Intermediate values used for optimistic verification
-pub struct SpartanVerifyInters<C: CurveGroup> {
-    pub sc1_inters: IPAInters<C>,
-    pub sc2_inters: IPAInters<C>,
-    pub z_eval_inters: PolyEvalProofInters<C>,
 }
 
 pub struct Spartan<C: CurveGroup> {
@@ -176,11 +168,7 @@ impl<C: CurveGroup> Spartan<C> {
         )
     }
 
-    pub fn verify(
-        &self,
-        proof: &SpartanProof<C>,
-        compute_inters: bool,
-    ) -> Option<SpartanVerifyInters<C>> {
+    pub fn verify(&self, proof: &SpartanProof<C>) {
         let mut transcript = Transcript::new(self.label);
         transcript.append_points(b"T", &proof.witness_eval_proof.T);
 
@@ -208,7 +196,7 @@ impl<C: CurveGroup> Spartan<C> {
         let sc_phase1_poly =
             |challenge: &[ScalarField<C>]| (v_A * v_B - v_C) * T_1_eq.eval(challenge);
 
-        let (sc1_inters, rx) = verify_sum(
+        let rx = verify_sum(
             &proof.sc_proof_1,
             &self.hyrax,
             sc_phase1_sum_target,
@@ -216,7 +204,6 @@ impl<C: CurveGroup> Spartan<C> {
             3,
             &mut transcript,
             b"sc_phase_1",
-            compute_inters,
         );
 
         // ############################
@@ -261,7 +248,7 @@ impl<C: CurveGroup> Spartan<C> {
             eval
         };
 
-        let (sc2_inters, _) = verify_sum(
+        let _ = verify_sum(
             &proof.sc_proof_2,
             &self.hyrax,
             sc_phase2_sum_target,
@@ -269,24 +256,12 @@ impl<C: CurveGroup> Spartan<C> {
             2,
             &mut transcript,
             b"sc_phase_2",
-            compute_inters,
         );
 
         let pcs_verify_timer = profiler_start("Verify PCS");
-        let z_eval_inters =
-            self.hyrax
-                .verify(&proof.witness_eval_proof, &mut transcript, compute_inters);
+        self.hyrax
+            .verify(&proof.witness_eval_proof, &mut transcript);
         profiler_end(pcs_verify_timer);
-
-        if compute_inters {
-            Some(SpartanVerifyInters {
-                sc1_inters: sc1_inters.unwrap(),
-                sc2_inters: sc2_inters.unwrap(),
-                z_eval_inters: z_eval_inters.unwrap(),
-            })
-        } else {
-            None
-        }
     }
 }
 
@@ -324,7 +299,7 @@ mod tests {
         // Verify a valid proof
 
         let proof_verify_timer = timer_start("Verify");
-        spartan.verify(&proof, true);
+        spartan.verify(&proof);
 
         timer_end(proof_verify_timer);
 

@@ -1,11 +1,6 @@
-use super::ipa::IPAInters;
 use crate::{
     spartan::transcript::Transcript,
-    spartan::{
-        ipa::IPA,
-        polynomial::eq_poly::EqPoly,
-        utils::{inner_prod, msm_powers},
-    },
+    spartan::{ipa::IPA, polynomial::eq_poly::EqPoly, utils::inner_prod},
     spartan::{
         ipa::{IPAComm, InnerProductProof},
         utils::msm,
@@ -39,13 +34,6 @@ pub struct PolyEvalProof<C: CurveGroup> {
     pub y: ScalarField<C>,
     pub T: Vec<C>,
     pub inner_prod_proof: InnerProductProof<C>,
-}
-
-// MSM intermediate powers used in optimistic verification
-#[derive(Clone)]
-pub struct PolyEvalProofInters<C: CurveGroup> {
-    pub T_prime_inters: Vec<C>,
-    pub ipa_inters: IPAInters<C>,
 }
 
 impl<C: CurveGroup> Hyrax<C> {
@@ -185,12 +173,7 @@ impl<C: CurveGroup> Hyrax<C> {
         }
     }
 
-    pub fn verify(
-        &self,
-        proof: &PolyEvalProof<C>,
-        transcript: &mut Transcript<C>,
-        compute_inters: bool,
-    ) -> Option<PolyEvalProofInters<C>> {
+    pub fn verify(&self, proof: &PolyEvalProof<C>, transcript: &mut Transcript<C>) {
         // Pad `x`
         let mut x = proof.x.clone();
         // x.resize(self.padded_num_vrs, ScalarField::<C>::ZERO);
@@ -206,31 +189,12 @@ impl<C: CurveGroup> Hyrax<C> {
         let L = EqPoly::new(x_low).evals();
         let R = EqPoly::new(x_high).evals();
 
-        // Compute the intermediate powers of L * T
-        let T_prime_inters = if compute_inters {
-            msm_powers(&L, &proof.T)
-        } else {
-            vec![]
-        };
-
         // Compute the commitment to the L * T
         let T_prime = msm(&L, &proof.T);
         assert_eq!(T_prime, proof.inner_prod_proof.comm);
         assert_eq!(x, proof.x);
 
-        let bp_result = self
-            .ipa
-            .verify(&proof.inner_prod_proof, R, transcript, compute_inters);
-
-        if compute_inters {
-            let ip_inters = bp_result.unwrap();
-            Some(PolyEvalProofInters {
-                T_prime_inters,
-                ipa_inters: ip_inters,
-            })
-        } else {
-            None
-        }
+        self.ipa.verify(&proof.inner_prod_proof, R, transcript);
     }
 }
 
@@ -268,6 +232,6 @@ mod tests {
         assert_eq!(eval_proof.y, y);
 
         let mut verifier_transcript = Transcript::new(b"test");
-        hyrax.verify(&eval_proof, &mut verifier_transcript, false);
+        hyrax.verify(&eval_proof, &mut verifier_transcript);
     }
 }

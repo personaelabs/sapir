@@ -1,6 +1,6 @@
 use super::SumCheckProof;
 use crate::spartan::hyrax::Hyrax;
-use crate::spartan::ipa::{IPAComm, IPAInters};
+use crate::spartan::ipa::IPAComm;
 use crate::spartan::sumcheck::unipoly::UniPoly;
 use crate::spartan::transcript::Transcript;
 use crate::timer::{profiler_end, profiler_start};
@@ -236,8 +236,7 @@ pub fn verify_sum<C: CurveGroup>(
     poly_degree: usize,
     transcript: &mut Transcript<C>,
     label: &'static [u8],
-    compute_inters: bool,
-) -> (Option<IPAInters<C>>, Vec<ScalarField<C>>) {
+) -> Vec<ScalarField<C>> {
     // Append the sum and the commitment to the blinder polynomial to the transcript.
     transcript.append_scalar(b"blinder_poly_sum", proof.blinder_poly_sum);
     transcript.append_point(b"blinder_poly_comm", proof.blinder_poly_eval_proof.comm);
@@ -274,15 +273,11 @@ pub fn verify_sum<C: CurveGroup>(
     let mut b = BlinderPoly::eval_point_powers(poly_degree, &challenge);
     b.resize(b.len().next_power_of_two(), ScalarField::<C>::ZERO);
 
-    (
-        hyrax.ipa.verify(
-            &proof.blinder_poly_eval_proof,
-            b,
-            transcript,
-            compute_inters,
-        ),
-        challenge,
-    )
+    hyrax
+        .ipa
+        .verify(&proof.blinder_poly_eval_proof, b, transcript);
+
+    challenge
 }
 
 #[cfg(test)]
@@ -368,7 +363,6 @@ mod tests {
             poly_degree,
             &mut verifier_transcript,
             label,
-            false,
         );
     }
 }

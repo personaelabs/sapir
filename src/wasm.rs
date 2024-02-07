@@ -92,7 +92,7 @@ macro_rules! embed_to_wasm {
             let circuit = CIRCUIT.lock().unwrap().clone();
 
             let spartan = Spartan::new($label, circuit);
-            spartan.verify(&proof, false);
+            spartan.verify(&proof);
 
             true
         }

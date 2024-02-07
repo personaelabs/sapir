@@ -1,7 +1,4 @@
-use crate::{
-    spartan::utils::{inner_prod, msm_powers},
-    ScalarField,
-};
+use crate::{spartan::utils::inner_prod, ScalarField};
 use ark_ec::CurveGroup;
 use ark_ff::{Field, UniformRand};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
@@ -21,11 +18,6 @@ pub struct InnerProductProof<C: CurveGroup> {
     pub R: C,
     pub z1: ScalarField<C>,
     pub z2: ScalarField<C>,
-}
-
-#[derive(Clone)]
-pub struct IPAInters<C: CurveGroup> {
-    pub s_G_inters: Vec<C>,
 }
 
 pub struct IPAComm<C: CurveGroup> {
@@ -280,8 +272,7 @@ impl<C: CurveGroup> IPA<C> {
         proof: &InnerProductProof<C>,
         b: Vec<ScalarField<C>>,
         transcript: &mut Transcript<C>,
-        compute_inters: bool,
-    ) -> Option<IPAInters<C>> {
+    ) {
         let n = b.len();
 
         // Append the claimed evaluation to the transcript
@@ -320,15 +311,6 @@ impl<C: CurveGroup> IPA<C> {
 
         let b = b_folded[0];
 
-        // Compute the intermediate values used for optimistic verification
-        let inters = if compute_inters {
-            let s_G_inters = msm_powers(&s, &self.gens.G[..s.len()]);
-
-            Some(IPAInters { s_G_inters })
-        } else {
-            None
-        };
-
         let G_final = msm_affine::<C>(&s, &self.gens.G_affine[..s.len()]).into_affine();
 
         // Compute Q
@@ -351,8 +333,6 @@ impl<C: CurveGroup> IPA<C> {
         let rhs = (G_final + (u * b).into_affine()) * proof.z1 + self.gens.H.unwrap() * proof.z2;
 
         assert_eq!(lhs.into_affine(), rhs.into_affine());
-
-        inters
     }
 }
 
@@ -393,6 +373,6 @@ mod tests {
         assert_eq!(eval_proof.y, y);
 
         let mut verifier_transcript = Transcript::new(b"test");
-        ipa.verify(&eval_proof, b, &mut verifier_transcript, false);
+        ipa.verify(&eval_proof, b, &mut verifier_transcript);
     }
 }
