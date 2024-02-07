@@ -22,6 +22,9 @@ pub struct HyraxComm<C: CurveGroup> {
     pub blinders: Vec<ScalarField<C>>,
 }
 
+/**
+ * Hyrax polynomial commitment scheme
+ */
 #[derive(Clone)]
 pub struct Hyrax<C: CurveGroup> {
     pub ipa: IPA<C>,

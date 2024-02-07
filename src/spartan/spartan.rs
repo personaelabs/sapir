@@ -24,7 +24,7 @@ pub struct SpartanProof<C: CurveGroup> {
     pub pub_input: Vec<ScalarField<C>>,
     pub sc_proof_1: SumCheckProof<C>,
     pub sc_proof_2: SumCheckProof<C>,
-    pub z_eval_proof: PolyEvalProof<C>,
+    pub witness_eval_proof: PolyEvalProof<C>,
     pub v_A: ScalarField<C>,
     pub v_B: ScalarField<C>,
     pub v_C: ScalarField<C>,
@@ -44,9 +44,8 @@ pub struct Spartan<C: CurveGroup> {
 }
 
 impl<C: CurveGroup> Spartan<C> {
-    // n: the length of the z vector
     pub fn new(label: &'static [u8], r1cs: R1CS<ScalarField<C>>) -> Self {
-        let n = r1cs.z_len();
+        let n = r1cs.num_vars.next_power_of_two();
         let m = (n as f64).log2() as usize;
 
         // The blinder polynomial in the first sumcheck
@@ -154,10 +153,10 @@ impl<C: CurveGroup> Spartan<C> {
 
         let z_open_timer = profiler_start("Open witness poly");
 
-        // Prove the evaluation of the polynomial Z(y) at ry
-        let z_eval_proof = self
-            .hyrax
-            .open(&committed_witness, ry[1..].to_vec(), &mut transcript);
+        // Prove the evaluation of the polynomial w(y) at ry[1..]
+        let witness_eval_proof =
+            self.hyrax
+                .open(&committed_witness, ry[1..].to_vec(), &mut transcript);
         profiler_end(z_open_timer);
 
         // Prove the evaluation of the polynomials A(y), B(y), C(y) at ry
@@ -168,7 +167,7 @@ impl<C: CurveGroup> Spartan<C> {
                 pub_input: r1cs_input.to_vec(),
                 sc_proof_1,
                 sc_proof_2,
-                z_eval_proof,
+                witness_eval_proof,
                 v_A,
                 v_B,
                 v_C,
@@ -183,7 +182,7 @@ impl<C: CurveGroup> Spartan<C> {
         compute_inters: bool,
     ) -> Option<SpartanVerifyInters<C>> {
         let mut transcript = Transcript::new(self.label);
-        transcript.append_points(b"T", &proof.z_eval_proof.T);
+        transcript.append_points(b"T", &proof.witness_eval_proof.T);
 
         let A_mle = self.r1cs.A.to_ml_extension();
         let B_mle = self.r1cs.B.to_ml_extension();
@@ -237,7 +236,7 @@ impl<C: CurveGroup> Spartan<C> {
 
         let sc_phase2_poly = |ry: &[ScalarField<C>]| {
             let rx_ry = [&rx, ry].concat();
-            let witness_eval = proof.z_eval_proof.inner_prod_proof.y;
+            let witness_eval = proof.witness_eval_proof.inner_prod_proof.y;
 
             let eval_timer = profiler_start("Eval R1CS");
             let A_eval = A_mle.eval_naive(&rx_ry);
@@ -274,9 +273,9 @@ impl<C: CurveGroup> Spartan<C> {
         );
 
         let pcs_verify_timer = profiler_start("Verify PCS");
-        let z_eval_inters = self
-            .hyrax
-            .verify(&proof.z_eval_proof, &mut transcript, compute_inters);
+        let z_eval_inters =
+            self.hyrax
+                .verify(&proof.witness_eval_proof, &mut transcript, compute_inters);
         profiler_end(pcs_verify_timer);
 
         if compute_inters {
