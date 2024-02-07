@@ -39,7 +39,7 @@ mod tests {
     use super::*;
     use crate::frontend::constraint_system::ConstraintSystem;
     use crate::test_var_pub_input;
-    use ark_ec::twisted_edwards::{MontCurveConfig, TECurveConfig};
+    use ark_ec::twisted_edwards::TECurveConfig;
     use ark_ec::{AffineRepr, CurveGroup};
     use ark_ed25519::EdwardsAffine;
     use ark_ed25519::EdwardsConfig;
@@ -60,7 +60,7 @@ mod tests {
         let out: AffinePoint<F> = ec_add_complete(p, q, d, a);
 
         cs.expose_public(out.x);
-        cs.expose_public(out.x);
+        cs.expose_public(out.y);
     }
 
     #[test]

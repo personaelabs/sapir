@@ -87,7 +87,7 @@ pub fn to_le_bits<F: PrimeField>(x: Wire<F>) -> Vec<Wire<F>> {
     }
 
     let recovered_x = form_le_bits(&bits);
-    cs.assert_equal(x, recovered_x, "");
+    cs.assert_equal(x, recovered_x, "to_le_bits failed");
 
     bits
 }

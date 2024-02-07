@@ -1181,7 +1181,7 @@ mod tests {
         cs.phase = Phase::CounterWires;
         (synthesizer)(&mut cs);
 
-        assert_eq!(cs.num_total_wires, Some(8));
+        assert_eq!(cs.num_total_wires, Some(6));
         assert_eq!(cs.num_priv_inputs, Some(1));
         assert_eq!(cs.num_pub_inputs, Some(3));
     }

@@ -121,7 +121,7 @@ mod tests {
         let out = ec_add_complete(p, q, cs);
 
         cs.expose_public(out.x);
-        cs.expose_public(out.x);
+        cs.expose_public(out.y);
     }
 
     #[test]
