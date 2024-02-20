@@ -57,7 +57,7 @@ macro_rules! embed_to_wasm {
             cs.set_constraints(&$synthesizer);
             *circuit = cs.to_r1cs();
 
-            #[cfg(target_arch = "wasm32")]
+            #[cfg(all(target_arch = "wasm32", feature = "profiler"))]
             {
                 web_sys::console::log_1(&JsValue::from_str("Num constraints:"));
                 web_sys::console::log_1(&JsValue::from_f64(cs.num_constraints.unwrap() as f64));
